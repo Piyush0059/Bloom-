@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile containing Bloom preferences, language mode, custom voice ID, and persistent memory settings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "customVoiceId": { "type": "string" },
+        "preferredLanguage": { "type": "string", "enum": ["ko", "en", "hinglish"] },
+        "cloudHistoryEnabled": { "type": "boolean" },
+        "persistentMemoryEnabled": { "type": "boolean" },
+        "onboarded": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "preferredLanguage", "cloudHistoryEnabled", "persistentMemoryEnabled", "onboarded", "createdAt", "updatedAt"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Supportive conversation session with rolling emotional summary and agreed next steps.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "language": { "type": "string", "enum": ["ko", "en", "hinglish"] },
+        "customVoiceId": { "type": "string" },
+        "messageCount": { "type": "integer" },
+        "summary": { "type": "string" },
+        "confirmedFeelings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "agreedNextSteps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lastMessageSnippet": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Single exchange in a session, supporting text and voice transcripts.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant", "crisis_alert"] },
+        "text": { "type": "string" },
+        "modality": { "type": "string", "enum": ["text", "voice"] },
+        "helpfulnessRating": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sessionId", "userId", "role", "text", "modality", "createdAt"]
+    },
+    "MemoryItem": {
+      "title": "MemoryItem",
+      "description": "Persistent structured long-term memory fact, preference, or goal retrieved across sessions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "category": { "type": "string", "enum": ["preference", "goal", "background", "instruction"] },
+        "content": { "type": "string" },
+        "sourceConversationId": { "type": "string" },
+        "userConfirmed": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "archived", "deleted"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "category", "content", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Bloom user preferences, language mode, custom voice ID, and persistent memory settings."
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Conversation sessions with rolling summaries scoped to user."
+    },
+    "/users/{userId}/sessions/{sessionId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Individual finalized messages and voice transcripts scoped to session."
+    },
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": "MemoryItem",
+      "description": "Structured persistent cross-session long-term memories scoped to user."
+    }
+  }
+}

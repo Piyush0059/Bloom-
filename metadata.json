@@ -1,0 +1,6 @@
+{
+  "name": "Bloom",
+  "description": "An emotionally intelligent AI companion focused on attentive listening, emotional support, personal growth, and practical guidance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

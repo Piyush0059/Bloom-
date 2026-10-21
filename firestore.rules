@@ -1,0 +1,132 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidTimestamp(val) {
+      return val is timestamp && val <= request.time;
+    }
+
+    // --- Entity Validation: UserProfile ---
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'preferredLanguage', 'cloudHistoryEnabled', 'onboarded', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.userId == userId
+        && data.preferredLanguage in ['ko', 'en', 'hinglish']
+        && (!('customVoiceId' in data) || (data.customVoiceId is string && data.customVoiceId.size() <= 128))
+        && (!('voicePreference' in data) || (data.voicePreference is string && data.voicePreference.size() <= 128))
+        && data.cloudHistoryEnabled is bool
+        && (!('persistentMemoryEnabled' in data) || data.persistentMemoryEnabled is bool)
+        && data.onboarded is bool
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 256))
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    // --- Entity Validation: Session ---
+    function isValidSession(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.userId == userId
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && (!('language' in data) || (data.language is string && data.language.size() <= 32))
+        && (!('customVoiceId' in data) || (data.customVoiceId is string && data.customVoiceId.size() <= 128))
+        && (!('voicePreference' in data) || (data.voicePreference is string && data.voicePreference.size() <= 128))
+        && (!('messageCount' in data) || (data.messageCount is int && data.messageCount >= 0))
+        && (!('summary' in data) || (data.summary is string && data.summary.size() <= 4000))
+        && (!('confirmedFeelings' in data) || (data.confirmedFeelings is list && data.confirmedFeelings.size() <= 50))
+        && (!('agreedNextSteps' in data) || (data.agreedNextSteps is list && data.agreedNextSteps.size() <= 50))
+        && (!('lastMessageSnippet' in data) || (data.lastMessageSnippet is string && data.lastMessageSnippet.size() <= 500))
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    // --- Entity Validation: Message ---
+    function isValidMessage(data, userId, sessionId) {
+      return data.keys().hasAll(['id', 'sessionId', 'userId', 'role', 'text', 'modality', 'createdAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.sessionId == sessionId
+        && data.userId == userId
+        && data.role in ['user', 'assistant', 'crisis_alert']
+        && data.text is string && data.text.size() > 0 && data.text.size() <= 20000
+        && data.modality in ['text', 'voice']
+        && (!('helpfulnessRating' in data) || (data.helpfulnessRating is string && data.helpfulnessRating.size() <= 64))
+        && isValidTimestamp(data.createdAt);
+    }
+
+    // --- Entity Validation: MemoryItem ---
+    function isValidMemoryItem(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'category', 'content', 'status', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.userId == userId
+        && data.category in ['preference', 'goal', 'background', 'instruction']
+        && data.content is string && data.content.size() > 0 && data.content.size() <= 4000
+        && data.status in ['active', 'archived', 'deleted']
+        && (!('sourceConversationId' in data) || (data.sourceConversationId is string && data.sourceConversationId.size() <= 128))
+        && (!('userConfirmed' in data) || (data.userConfirmed is bool))
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidUserProfile(request.resource.data, userId);
+      allow update: if isOwner(userId)
+        && isValidUserProfile(request.resource.data, userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
+
+      match /sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidSession(request.resource.data, userId);
+        allow update: if isOwner(userId)
+          && isValidSession(request.resource.data, userId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && isValidMessage(request.resource.data, userId, sessionId);
+          allow update: if isOwner(userId)
+            && isValidMessage(request.resource.data, userId, sessionId)
+            && request.resource.data.userId == resource.data.userId
+            && request.resource.data.sessionId == resource.data.sessionId
+            && request.resource.data.createdAt == resource.data.createdAt;
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /memories/{memoryId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidMemoryItem(request.resource.data, userId);
+        allow update: if isOwner(userId)
+          && isValidMemoryItem(request.resource.data, userId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
