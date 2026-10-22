@@ -59,7 +59,7 @@ class AuraViewModel(
             id = auth.currentUser?.uid ?: "guest_user",
             userId = auth.currentUser?.uid ?: "guest_user",
             displayName = auth.currentUser?.displayName ?: "Guest Companion",
-            voicePreference = "Aoede",
+            voicePreference = "None",
             preferredLanguage = "en",
             cloudHistoryEnabled = auth.currentUser != null,
             onboarded = false
@@ -81,7 +81,7 @@ class AuraViewModel(
     private val _orbState = MutableStateFlow(OrbState.IDLE)
     val orbState: StateFlow<OrbState> = _orbState.asStateFlow()
 
-    private val _isVoiceMode = MutableStateFlow(true)
+    private val _isVoiceMode = MutableStateFlow(false)
     val isVoiceMode: StateFlow<Boolean> = _isVoiceMode.asStateFlow()
 
     private val _isDeepThinking = MutableStateFlow(false)
@@ -92,6 +92,9 @@ class AuraViewModel(
 
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
+
+    private fun isUsableFriendVoiceId(value: String?): Boolean =
+        value != null && Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$").matches(value.trim())
 
     private val _showFeedbackPrompt = MutableStateFlow(false)
     val showFeedbackPrompt: StateFlow<Boolean> = _showFeedbackPrompt.asStateFlow()
@@ -163,6 +166,11 @@ class AuraViewModel(
             loadUserAndSessions()
         }
         loadUserAndSessions()
+        viewModelScope.launch {
+            voiceManager.voiceError.collect { error ->
+                if (!error.isNullOrBlank()) _statusMessage.value = error
+            }
+        }
     }
 
     private fun loadUserAndSessions() {
@@ -171,9 +179,8 @@ class AuraViewModel(
             repository.observeUserProfile(uid).collect { profile ->
                 if (profile != null) {
                     _userProfile.value = profile
-                    if (profile.voicePreference == "None") {
-                        _isVoiceMode.value = false
-                    }
+                    _isVoiceMode.value = profile.voicePreference == "Friend" &&
+                        isUsableFriendVoiceId(profile.customVoiceId)
                 }
             }
         }
@@ -205,9 +212,10 @@ class AuraViewModel(
         val uid = _currentUser.value?.uid ?: "guest_user"
         val voice = _userProfile.value.voicePreference
         val lang = _userProfile.value.preferredLanguage
+        val customVoiceId = _userProfile.value.customVoiceId
 
         viewModelScope.launch {
-            val result = repository.createSession(uid, title, voice, lang)
+            val result = repository.createSession(uid, title, voice, lang, customVoiceId)
             if (result.isSuccess) {
                 val newSessionId = result.getOrNull()
                 if (newSessionId != null) {
@@ -216,6 +224,7 @@ class AuraViewModel(
                         userId = uid,
                         title = title,
                         voicePreference = voice,
+                        customVoiceId = customVoiceId,
                         language = lang
                     )
                     _activeSession.value = session
@@ -237,8 +246,8 @@ class AuraViewModel(
 
         viewModelScope.launch {
             repository.addMessage(uid, session.id, "assistant", greeting, if (_isVoiceMode.value) "voice" else "text")
-            if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
-                voiceManager.speak(greeting, _userProfile.value.voicePreference, _userProfile.value.preferredLanguage)
+            if (_isVoiceMode.value && isUsableFriendVoiceId(_userProfile.value.customVoiceId)) {
+                voiceManager.speak(greeting, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
             }
         }
     }
@@ -248,11 +257,23 @@ class AuraViewModel(
     }
 
     fun setVoiceMode(enabled: Boolean) {
+        if (enabled && !isUsableFriendVoiceId(_userProfile.value.customVoiceId)) {
+            _isVoiceMode.value = false
+            _statusMessage.value = "Friend's voice is not configured. Add a valid Gemini replicated voice ID in Settings; Bloom will remain text-only."
+            return
+        }
+        if (enabled && _userProfile.value.voicePreference != "Friend") {
+            val updated = _userProfile.value.copy(voicePreference = "Friend")
+            _userProfile.value = updated
+            viewModelScope.launch { repository.saveUserProfile(updated) }
+        }
         _isVoiceMode.value = enabled
         if (!enabled) {
             voiceManager.stopListeningManually()
             voiceManager.stopAudioPlayback()
             _orbState.value = OrbState.IDLE
+        } else {
+            _statusMessage.value = "Only the configured friend voice will be used."
         }
     }
 
@@ -265,14 +286,18 @@ class AuraViewModel(
     }
 
     fun completeOnboarding(voicePreference: String, language: String, stayGuest: Boolean) {
+        val selectedVoice = if (voicePreference == "Friend") "Friend" else "None"
         val updated = _userProfile.value.copy(
-            voicePreference = voicePreference,
+            voicePreference = selectedVoice,
             preferredLanguage = language,
             onboarded = true,
             cloudHistoryEnabled = !stayGuest
         )
         _userProfile.value = updated
-        _isVoiceMode.value = (voicePreference != "None")
+        _isVoiceMode.value = selectedVoice == "Friend" && isUsableFriendVoiceId(updated.customVoiceId)
+        if (selectedVoice == "Friend" && !_isVoiceMode.value) {
+            _statusMessage.value = "Friend's voice is not configured yet. Add the verified replica ID in Settings; no other voice will be used."
+        }
         viewModelScope.launch {
             repository.saveUserProfile(updated)
             if (_activeSession.value == null) {
@@ -338,7 +363,7 @@ class AuraViewModel(
 
                 // Vocalize response if in voice mode and not text only
                 if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
-                    voiceManager.speak(responseText, _userProfile.value.voicePreference, _userProfile.value.preferredLanguage)
+                    voiceManager.speak(responseText, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
                 }
 
                 // Show supportive feedback check every few turns
@@ -406,7 +431,7 @@ Please move to a safe space and reach out to someone you trust or a professional
         repository.addMessage(uid, session.id, "crisis_alert", crisisMessage, modality)
 
         if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
-            voiceManager.speak(crisisMessage, _userProfile.value.voicePreference, _userProfile.value.preferredLanguage)
+            voiceManager.speak(crisisMessage, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
         }
     }
 
@@ -445,7 +470,7 @@ Please move to a safe space and reach out to someone you trust or a professional
     fun replayLastAssistantAudio() {
         val lastMsg = _messages.value.lastOrNull { it.role == "assistant" || it.role == "crisis_alert" }
         if (lastMsg != null) {
-            voiceManager.speak(lastMsg.text, _userProfile.value.voicePreference, _userProfile.value.preferredLanguage)
+            voiceManager.speak(lastMsg.text, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
         }
     }
 
@@ -464,7 +489,7 @@ Please move to a safe space and reach out to someone you trust or a professional
                 val adjustment = "Thank you for telling me. I will adjust right away. Would you prefer I simply listen without giving suggestions, or would you like to unpack a specific feeling together?"
                 repository.addMessage(uid, sess.id, "assistant", adjustment, if (_isVoiceMode.value) "voice" else "text")
                 if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
-                    voiceManager.speak(adjustment, _userProfile.value.voicePreference, _userProfile.value.preferredLanguage)
+                    voiceManager.speak(adjustment, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
                 }
             } else if (rating == "not_yet") {
                 val gentle = "I understand. Take all the time you need; there's no rush to fix anything today."
@@ -589,16 +614,40 @@ Please move to a safe space and reach out to someone you trust or a professional
     }
 
     fun updatePreferences(voice: String, language: String, cloudHistory: Boolean) {
+        val selectedVoice = if (voice == "Friend") "Friend" else "None"
         val updated = _userProfile.value.copy(
-            voicePreference = voice,
+            voicePreference = selectedVoice,
             preferredLanguage = language,
             cloudHistoryEnabled = cloudHistory
         )
         _userProfile.value = updated
-        _isVoiceMode.value = (voice != "None")
+        _isVoiceMode.value = selectedVoice == "Friend" && isUsableFriendVoiceId(updated.customVoiceId)
+        if (selectedVoice == "None") {
+            voiceManager.stopAudioPlayback()
+        } else if (!_isVoiceMode.value) {
+            _statusMessage.value = "Add a valid Gemini replicated voice ID in Settings before enabling spoken replies."
+        }
         viewModelScope.launch {
             repository.saveUserProfile(updated)
         }
+    }
+
+    fun updateCustomVoiceId(value: String): String {
+        val voiceId = value.trim()
+        if (!isUsableFriendVoiceId(voiceId)) {
+            return "Invalid voice ID. Use the voice_… or voicekey_… ID returned by Google AI Studio Voice Replication."
+        }
+        val updated = _userProfile.value.copy(customVoiceId = voiceId, voicePreference = "Friend")
+        _userProfile.value = updated
+        _isVoiceMode.value = true
+        _statusMessage.value = "Friend's voice ID saved. Bloom will only use this voice."
+        viewModelScope.launch {
+            val result = repository.saveUserProfile(updated)
+            if (result.isFailure) {
+                _statusMessage.value = "Voice ID is active for this session, but profile save failed. Sign in and check Firebase to persist it."
+            }
+        }
+        return "Friend's voice ID saved. No generic/system voice will be used."
     }
 
     override fun onCleared() {
