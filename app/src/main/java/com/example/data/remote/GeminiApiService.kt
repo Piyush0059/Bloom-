@@ -14,14 +14,14 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.Path
-import retrofit2.http.Query
+import retrofit2.http.Header
 import java.util.concurrent.TimeUnit
 
 interface GeminiApiService {
     @POST("v1beta/models/{model}:generateContent")
     suspend fun generateContent(
         @Path("model") model: String,
-        @Query("key") apiKey: String,
+        @Header("x-goog-api-key") apiKey: String,
         @Body request: GenerateContentRequest
     ): GenerateContentResponse
 }
@@ -147,7 +147,7 @@ $memoryContextBuilder
             return@withContext Result.failure(IllegalStateException("GEMINI_API_KEY is not configured in Secrets panel."))
         }
 
-        val model = if (isDeepThinking) "gemini-3.1-pro-preview" else "gemini-3.5-flash"
+        val model = if (isDeepThinking) "gemini-3.1-pro-preview" else "gemini-3.8-flash"
         val thinkingConfig = if (isDeepThinking) ThinkingConfig(thinkingLevel = "high") else null
 
         val request = GenerateContentRequest(
@@ -175,7 +175,8 @@ $memoryContextBuilder
 
     suspend fun generateTTSAudio(
         text: String,
-        customVoiceId: String
+        customVoiceId: String,
+        language: String = "en"
     ): Result<ByteArray> = withContext(Dispatchers.IO) {
         val apiKey = getApiKey()
         if (apiKey.isBlank()) {
@@ -183,9 +184,9 @@ $memoryContextBuilder
         }
 
         val voiceId = customVoiceId.trim()
-        if (voiceId.isBlank()) {
+        if (!voiceId.matches(Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$"))) {
             return@withContext Result.failure(
-                IllegalStateException("BLOOM_CUSTOM_VOICE_ID is not configured. Voice output is unavailable. Please configure the verified friend voice in Settings.")
+                IllegalStateException("Friend's voice is not configured. Add a valid Gemini replicated voice ID after the voice owner completes the consent process.")
             )
         }
 
@@ -196,10 +197,12 @@ $memoryContextBuilder
             generationConfig = GenerationConfig(
                 responseModalities = listOf("AUDIO"),
                 speechConfig = SpeechConfig(
-                    voiceConfig = VoiceConfig(
-                        replicatedVoiceConfig = ReplicatedVoiceConfig(voiceId = voiceId),
-                        prebuiltVoiceConfig = PrebuiltVoiceConfig(voiceName = voiceId)
-                    )
+                    voiceConfig = VoiceConfig(voice = voiceId),
+                    languageCode = when (language.lowercase()) {
+                        "ko" -> "ko-KR"
+                        "hinglish", "hi" -> "en-IN"
+                        else -> "en-US"
+                    }
                 )
             )
         )
