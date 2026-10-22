@@ -1,80 +1,113 @@
-# Bloom — AI companion web preview
+# Bloom — private AI companion
 
-Bloom is a responsive, single-file web MVP for a calm multilingual AI companion. The repository is intentionally static so it can be hosted with GitHub Pages without a build step.
+Bloom is a mobile-first, multilingual AI companion with a calm animated interface. This repository now targets **Vercel**, not GitHub Pages, because the app uses server-side secrets, private-session authentication, and protected API routes.
 
-## Included in this preview
+## What is implemented
 
-- Responsive dark interface with a layered animated intelligence sphere.
-- English, Korean, and Hinglish interface/prompt selection.
-- Gemini text chat using the official `generateContent` REST endpoint.
-- A session-only API-key input (the key is not committed to the repository or stored in local chat history).
-- Local browser conversation history, new conversations, export-to-JSON, deletion, and an optional user-authored memory note.
-- Optional recent-conversation excerpts in prompts when the user explicitly enables the Memory setting.
-- Browser speech-recognition input where available; no speech is played back.
-- Keyboard navigation, responsive mobile layout, reduced-motion support, and accessible labels.
-- A GitHub Actions workflow that checks the entry point and deploys the static files to GitHub Pages.
+- Responsive dark UI with an animated orbital intelligence sphere and reduced-motion support.
+- Interface/prompt language modes: Hinglish, English, and Korean.
+- Gemini text chat through a same-origin server function; the Gemini API key is never sent to browser JavaScript.
+- Password-protected private access using an HTTP-only, SameSite cookie signed with a server secret.
+- Server-side checks for payload sizes, request origin, methods, authentication and best-effort per-instance rate limits.
+- Browser-local conversation history, chat switching, JSON export, delete-all and optional user-controlled memory.
+- Browser speech recognition as input only where supported. Bloom does not use browser/system text-to-speech.
+- Optional ElevenLabs text-to-speech that activates only when the owner's approved voice ID, provider API key and explicit consent flag are configured server-side. There is no voice fallback.
+- Baseline smoke tests for login, signed sessions, protected chat, consent-gated voice and logout.
+- Security response headers, content-security-policy, no-cache APIs and deployment configuration.
 
-## Important: what is not connected
+## Important voice status
 
-This is a **web MVP**, not the complete production version of Bloom.
+The voice file shared for this project is an **8.04-second AAC clip**. It is not included in the public GitHub repository. This is too short to promise a high-fidelity voice clone. ElevenLabs recommends roughly **1–2 minutes of clear, consistent audio** for Instant Voice Cloning; source quality, accent and delivery affect the result. See the [official voice-cloning guide](https://elevenlabs.io/docs/eleven-creative/voices/voice-cloning/instant-voice-cloning).
 
-- **Friend's voice:** speech replies are deliberately disabled. No generic/system voice is used. A voice provider, authorized voice asset, clear consent, and backend integration still need to be connected and tested.
-- **Production security:** the browser calls Gemini directly. The API key is entered by the user and retained only in `sessionStorage`; however, a browser-based key is still visible to that browser session and can be exposed by malicious extensions or device access. Do not distribute a shared key or offer this as a public multi-user service. A production release should route requests through an authenticated server or serverless function, store secrets in environment variables, apply rate limits, and enforce per-user quotas.
-- **Persistent cross-device memory:** chat history is stored in that browser's local storage. It does not sync across devices or have user accounts/backups. Export the JSON file to keep a backup.
-- **No verified therapeutic benefit:** Bloom is an AI companion, not a mental-health professional or an emergency service. Crisis behavior must receive dedicated testing and appropriate expert review before a public launch.
+Only continue with the friend's voice if she explicitly agrees to this specific use. The recommended path is for the friend/voice owner to create or authorize an eligible Instant Voice Clone in the provider account, complete any consent/verification prompts themselves, and privately share the permitted voice ID. Professional Voice Cloning is restricted to the voice owner's own voice by ElevenLabs policy; do not bypass this. See [ElevenLabs voice-cloning policy and methods](https://elevenlabs.io/docs/eleven-api/concepts/voice-cloning).
 
-## Run locally
+The app's voice toggle stays disabled until these environment variables are present and the consent flag is explicitly enabled:
 
-Open `index.html` in a modern browser. For browser features that require a secure context, use HTTPS or `localhost`.
+- `ELEVENLABS_API_KEY`
+- `ELEVENLABS_VOICE_ID`
+- `BLOOM_VOICE_CONSENT_CONFIRMED=true`
 
-1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Open Bloom and choose **Set up AI**.
-3. Paste your own key, select a model that is enabled for your account, and save.
-4. Start a conversation. Do not commit keys to source control.
+Do not set the consent flag unless the voice owner has clearly agreed and you are permitted to use that voice. The audio file itself is never sent by this app to ElevenLabs; the server only sends the generated reply text to the voice already configured by the owner.
 
-The app currently uses the Gemini REST endpoint `v1beta/models/{model}:generateContent`. Models and account availability can change; see Google's [current models list](https://ai.google.dev/gemini-api/docs/models).
+## Set up and deploy on Vercel
 
-## Publish using GitHub Pages
+### 1. Import the repository
 
-A GitHub Actions workflow is included at `.github/workflows/pages.yml`.
+1. Open [Vercel](https://vercel.com/new) and sign in.
+2. Import the GitHub repository `Piyush0059/Bloom-`.
+3. Use the repository root as the project root. Framework preset: **Other**. No frontend build command is required.
+4. Add the environment variables below before the first production deployment. Redeploy after changing environment values.
 
-1. Push the repository to the `main` branch.
-2. Open **Settings → Pages** for this repository.
-3. In **Build and deployment → Source**, select **GitHub Actions** and save. This repository setting has to be enabled by an account with admin access.
-4. Open **Actions** and wait for the **Deploy Bloom to GitHub Pages** workflow to finish successfully.
-5. Open the Pages URL GitHub displays under **Settings → Pages** and test the page on mobile and desktop.
+### 2. Required server variables
 
-Typical URL format: `https://piyush0059.github.io/Bloom-/` (the actual URL only becomes available after Pages is enabled and the workflow succeeds).
+Set these in **Vercel → Project → Settings → Environment Variables** for the environment you intend to use (Production, and Preview if needed):
 
-If the workflow fails, check its run log first. Do not treat the site as deployed unless the Actions deployment job succeeds and the live URL loads.
+| Variable | Required | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | Server-only Google Gemini API key |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.8-flash`; override if that model isn't enabled for your account |
+| `BLOOM_ACCESS_PASSWORD` | Yes | Private sign-in password; use a unique value at least 12 characters long |
+| `BLOOM_SESSION_SECRET` | Yes | Random secret of at least 32 characters used to sign session cookies |
+| `ELEVENLABS_API_KEY` | Voice only | Server-only voice provider key |
+| `ELEVENLABS_VOICE_ID` | Voice only | ID of the eligible, consented voice already in the provider account |
+| `BLOOM_VOICE_CONSENT_CONFIRMED` | Voice only | Set to literal `true` only after explicit voice-owner consent and provider policy checks |
 
-## Smoke-test checklist
+Generate a session secret in a trusted terminal with `openssl rand -hex 32`. Do not put secret values in source code, GitHub commits, screenshots, or this chat. Do not use the same secret as the access password.
 
-- [ ] Open on a phone and desktop; check responsive layout and keyboard focus.
-- [ ] Switch between Hinglish, English, and Korean; verify interface text changes.
-- [ ] Without an API key, try sending a message; Bloom should explain how to configure AI.
-- [ ] With a valid key and available model, verify multi-turn replies; test invalid key, unavailable model, quota exhaustion, and offline failure.
-- [ ] Create two conversations, switch via History, refresh, and confirm local history remains.
-- [ ] Export JSON; inspect that messages exist and that no API key is included.
-- [ ] Delete all history; confirm it is gone after refresh.
-- [ ] Toggle Memory off and on; check whether prior chat excerpts are included only when enabled.
-- [ ] Test microphone denial and unsupported-browser fallback.
-- [ ] Verify there is **no speech playback** and no generic voice.
-- [ ] Test reduced motion, narrow 320-pixel screens, and browser zoom.
-- [ ] Review API usage/quota and privacy notice before public use.
+Google's official model list: [Gemini API models](https://ai.google.dev/gemini-api/docs/models). ElevenLabs' official synchronous speech endpoint: [Create speech](https://elevenlabs.io/docs/api-reference/text-to-speech/convert).
 
-## Repository structure
+### 3. Sign in and test
+
+After Vercel finishes deploying, open the Production URL:
+
+1. Sign in with `BLOOM_ACCESS_PASSWORD`.
+2. Send a short chat message and confirm that a reply appears.
+3. Refresh and switch chats; confirm history remains in the same browser.
+4. Export the conversation JSON and confirm that it contains no API keys.
+5. Sign out; verify the API returns to a locked state.
+6. To test audio, first configure an authorized voice ID plus the three voice environment variables, redeploy, then enable **Voice on · friend's voice**. If voice configuration is incomplete, no speech plays.
+
+For a first deployment, visit `/api/session` on the Vercel domain. It reports only whether setup/login/voice are ready; it does not return keys. A correctly configured site should report `configured: true`. Sign-in is required before chat requests are accepted.
+
+## Security and known limits
+
+- This is a personal, password-protected MVP, not a multi-user SaaS authentication system.
+- The rate limiter is per serverless instance and best-effort; it does not replace provider-level spending limits, quotas or centralized rate limiting.
+- Conversation history and memory are stored in the current browser's local storage. They do not sync between devices. When Memory is enabled, selected recent excerpts and the user-entered note are sent to Gemini as context.
+- Gemini and voice calls are made by server functions. Provider responses can still fail because of invalid credentials, quota, model availability, network or provider policy.
+- Voice audio is not guaranteed to sound identical to the source speaker; synthesis can change accent, prosody and pronunciation.
+- Browser dictation availability and its processing vary by browser. It is input-only, not a spoken-response fallback.
+- Bloom is not a therapist or emergency service. Crisis responses need independent safety review before wider public release.
+
+## Local checks
+
+Requires Node.js 22 or later:
+
+```bash
+npm test
+```
+
+This runs JavaScript syntax checks plus small local tests of authentication and consent gating. It does not call paid external APIs; live Gemini and voice-provider checks must be performed after secrets are configured in Vercel.
+
+## Repository layout
 
 ```text
 Bloom-/
 ├── index.html
-├── favicon.svg
-├── README.md
-└── .github/
-    └── workflows/
-        └── pages.yml
+├── api/
+│   ├── chat.js
+│   ├── login.js
+│   ├── logout.js
+│   └── session.js
+├── lib/
+│   └── security.js
+├── tests/
+│   └── smoke.js
+├── .github/workflows/ci.yml
+├── package.json
+└── vercel.json
 ```
 
-## License
+## Deployment reality
 
-No license is declared yet. Add one before inviting external contributions or permitting reuse.
+GitHub Pages cannot run these API functions. Deploy on Vercel (or another Node.js serverless host configured for these routes) so keys remain server-side. A successful GitHub commit or local test is not evidence of a live deployment: use Vercel's completed deployment URL and test the protected API in that live environment.
