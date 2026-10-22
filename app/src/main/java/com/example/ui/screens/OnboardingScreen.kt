@@ -107,7 +107,7 @@ fun OnboardingScreen(
                     .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = "AURA CORE // INITIALIZING EMPATHY PROTOCOL",
+                    text = "BLOOM CORE // READY TO LISTEN",
                     style = TechnicalMonospace,
                     color = AuraCyanGlow
                 )
@@ -116,7 +116,7 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "AURA",
+                text = "BLOOM",
                 style = MaterialTheme.typography.displayLarge.copy(
                     brush = Brush.horizontalGradient(listOf(AuraIceCyan, AuraLavender))
                 ),
@@ -228,7 +228,7 @@ fun OnboardingScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "• AURA is an AI companion designed for emotional reflection, not a human, therapist, or medical device.\n• It cannot diagnose conditions or guarantee healing.\n• Not for crisis care. Dedicated help numbers (like Tele-MANAS 14416) are always available.\n• Microphone access is only requested if you begin speaking.",
+                        text = "• Bloom is an AI companion for reflection, not a human, therapist, or medical device.\n• It cannot diagnose conditions or guarantee healing.\n• It is not an emergency service; support resources are available in Help Now.\n• Microphone permission is requested only when you start voice input.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AuraTextSecondary,
                         lineHeight = 18.sp
