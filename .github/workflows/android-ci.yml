@@ -110,6 +110,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Start Firebase Auth and Firestore emulators
+        shell: bash
+        run: |
+          firebase emulators:start --only auth,firestore --project demo-no-project --non-interactive > /tmp/bloom-firebase-emulators.log 2>&1 &
+          echo $! > /tmp/bloom-firebase-emulators.pid
+          ready=false
+          for attempt in $(seq 1 90); do
+            if curl --silent --output /dev/null http://127.0.0.1:8085/ && curl --silent --output /dev/null http://127.0.0.1:9099/; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/bloom-firebase-emulators.pid)" 2>/dev/null; then
+              cat /tmp/bloom-firebase-emulators.log
+              exit 1
+            fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            cat /tmp/bloom-firebase-emulators.log
+            echo "Firebase emulators did not become ready in time."
+            exit 1
+          fi
+          echo "Firebase Auth and Firestore emulators are reachable."
+
       - name: Run Android unit tests
         id: unit-tests
         continue-on-error: true
@@ -125,6 +152,16 @@ jobs:
             app/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Show Firebase emulator log on failure
+        if: failure()
+        run: |
+          if [ -f /tmp/bloom-firebase-emulators.log ]; then tail -n 250 /tmp/bloom-firebase-emulators.log; fi
+
+      - name: Stop Firebase emulators
+        if: always()
+        run: |
+          if [ -f /tmp/bloom-firebase-emulators.pid ]; then kill "$(cat /tmp/bloom-firebase-emulators.pid)" 2>/dev/null || true; fi
 
       - name: Fail the job when unit tests fail
         if: steps.unit-tests.outcome == 'failure'
