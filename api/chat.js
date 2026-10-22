@@ -19,7 +19,7 @@ function makeSystemPrompt(language, memory) {
   return prompt;
 }
 
-function pcmToWav(pcm, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
+export function pcmToWav(pcm, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
   if (pcm.length >= 12 && pcm.toString("ascii", 0, 4) === "RIFF" && pcm.toString("ascii", 8, 12) === "WAVE") {
     return pcm;
   }
