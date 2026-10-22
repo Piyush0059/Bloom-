@@ -248,7 +248,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     SettingOptionRow(
                         title = "Text Only (No Spoken Replies)",
-                        isSelected = userProfile.voicePreference == "None",
+                        isSelected = userProfile.voicePreference != "Friend",
                         onClick = { viewModel.updatePreferences("None", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled) }
                     )
                     Spacer(modifier = Modifier.height(14.dp))
