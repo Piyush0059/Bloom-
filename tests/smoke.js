@@ -21,7 +21,9 @@ assert.equal(html.includes('id="voiceToggleButton"'), true, "voice toggle must e
 assert.equal(inlineScript.includes('new Blob([bytes],{type:"audio/wav"})'), true, "browser voice playback must use WAV");
 const chatSource = await readFile(new URL("../api/chat.js", import.meta.url), "utf8");
 assert.equal(chatSource.includes("elevenlabs.io"), false, "voice output must use Gemini, not a second provider");
-assert.equal(chatSource.includes("gemini-3.8-flash-tts"), true, "Gemini TTS endpoint must be configured");
+assert.equal(chatSource.includes("gemini-3.8-flash-tts"), true, "Gemini TTS model must be configured");
+assert.equal(chatSource.includes('https://generativelanguage.googleapis.com/v1beta/interactions'), true, "replicated voice must use the official Interactions endpoint");
+assert.equal(chatSource.includes("models/gemini-3.8-flash-tts:generateContent"), false, "replicated voice must not use the generic generateContent route");
 const pcm = Buffer.from([0, 0, 1, 0, 255, 127, 0, 0]);
 const wav = pcmToWav(pcm);
 assert.equal(wav.toString("ascii", 0, 4), "RIFF");
