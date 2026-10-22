@@ -61,6 +61,19 @@ jobs:
           "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
           "$SDKMANAGER" "platforms;android-36.1" || echo "API 36.1 package unavailable from this mirror; build output will determine whether it is required."
 
+      - name: Generate a CI-only debug signing key
+        shell: bash
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -noprompt \
+              -keystore debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Generate the missing Gradle wrapper
         id: wrapper
         shell: bash
