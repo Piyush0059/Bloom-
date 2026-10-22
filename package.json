@@ -1,0 +1,13 @@
+{
+  "name": "bloom-private-companion",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node --check lib/security.js && node --check api/session.js && node --check api/login.js && node --check api/logout.js && node --check api/chat.js && node --check tests/smoke.js",
+    "test": "npm run check && node tests/smoke.js"
+  }
+}
