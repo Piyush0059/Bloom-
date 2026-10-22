@@ -135,7 +135,7 @@ let sessions=readJSON(STORAGE_KEY,[]);
 if(!Array.isArray(sessions))sessions=[];
 let currentSessionId=localStorage.getItem(CURRENT_KEY)||"";
 let currentSession=sessions.find(function(s){return s.id===currentSessionId;})||null;
-let isBusy=false, recognition=null, listening=false, toastTimer=null, memoryEnabled=localStorage.getItem(MEMORY_KEY)!=="false";
+let isBusy=false, recognition=null, listening=false, toastTimer=null, memoryEnabled=localStorage.getItem(MEMORY_KEY)==="true";
 function t(key){return (TEXT[language]&&TEXT[language][key])||TEXT.en[key]||key;}
 function readJSON(key,fallback){try{const x=localStorage.getItem(key);return x?JSON.parse(x):fallback;}catch(e){return fallback;}}
 function writeJSON(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true;}catch(e){showToast("Browser storage is full or blocked. Export history and clear some space.",true);return false;}}
@@ -284,7 +284,7 @@ async function sendMessage(){
   let key="";try{key=sessionStorage.getItem("bloom.gemini-key")||"";}catch(e){}
   if(!key){showToast(t("keyMissing"),true);openSettings();return;}
   if(!currentSession)createSession();
-  input.value="";resizeInput();pushMessage("user",message);isBusy=true;$("sendButton").disabled=true;$("orbStatus").textContent=t("waiting");renderMessages();
+  input.value="";resizeInput();const sessionAtSend=currentSession;isBusy=true;$("sendButton").disabled=true;$("newChatButton").disabled=true;$("historyButton").disabled=true;pushMessage("user",message);$("orbStatus").textContent=t("waiting");renderMessages();
   const history=apiHistory();
   try{
     const savedModel=localStorage.getItem(MODEL_KEY)||"gemini-3.8-flash";const model=["gemini-3.8-flash","gemini-3.6-flash"].includes(savedModel)?savedModel:"gemini-3.8-flash";
@@ -304,13 +304,14 @@ async function sendMessage(){
     pushMessage("assistant",answer);
     $("orbStatus").textContent=t("orbStatus");
   }catch(err){
-    showToast(err&&err.message?err.message:t("apiError"),true);
+    if(currentSession&&currentSession.id===sessionAtSend.id&&currentSession.messages.length){const last=currentSession.messages[currentSession.messages.length-1];if(last.role==="user"&&last.text===message){currentSession.messages.pop();persistCurrent();}}
+    input.value=message;resizeInput();showToast(err&&err.message?err.message:t("apiError"),true);
     $("orbStatus").textContent=t("orbStatus");
   }finally{
-    isBusy=false;$("sendButton").disabled=false;renderMessages();input.focus();
+    isBusy=false;$("sendButton").disabled=false;$("newChatButton").disabled=false;$("historyButton").disabled=false;renderMessages();input.focus();
   }
 }
-function startNewChat(){isBusy=false;createSession();closeDialog("historyDialog");showToast(t("newChatToast"));}
+function startNewChat(){if(isBusy)return;createSession();closeDialog("historyDialog");showToast(t("newChatToast"));}
 function exportHistory(){
   const payload={app:"Bloom",exportedAt:now(),language:language,memoryEnabled:memoryEnabled,memoryNote:localStorage.getItem(NOTE_KEY)||"",sessions:sessions};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
