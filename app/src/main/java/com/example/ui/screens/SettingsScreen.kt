@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AuraBorderNavy
@@ -73,6 +74,7 @@ import com.example.ui.theme.AuraTextMuted
 import com.example.ui.theme.AuraTextPrimary
 import com.example.ui.theme.AuraTextSecondary
 import com.example.ui.theme.AuraViolet
+import com.example.data.remote.GeminiApiKeyStore
 import com.example.ui.viewmodel.AuraViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,6 +89,7 @@ fun SettingsScreen(
     val isGuest by viewModel.isGuestMode.collectAsState()
 
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var geminiApiKeyDraft by remember { mutableStateOf(GeminiApiKeyStore.getStoredKey()) }
     var voiceIdDraft by remember(userProfile.customVoiceId) { mutableStateOf(userProfile.customVoiceId) }
 
     Scaffold(
@@ -212,6 +215,79 @@ fun SettingsScreen(
                             Text("Sign in with Google")
                         }
                     }
+                }
+            }
+
+            // Gemini key is encrypted locally with the Android Keystore. It is never synced to Firebase.
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = AuraSurfaceNavy),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AuraBorderNavy)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "AI Chat Setup",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AuraTextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Add your own Gemini API key so this installed APK can answer messages. The key is encrypted on this device and is not saved in GitHub or Firebase.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AuraTextMuted,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = geminiApiKeyDraft,
+                        onValueChange = { geminiApiKeyDraft = it },
+                        modifier = Modifier.fillMaxWidth().testTag("gemini_api_key_input"),
+                        label = { Text("Gemini API key") },
+                        placeholder = { Text("Paste your personal API key") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                val saved = GeminiApiKeyStore.saveKey(context, geminiApiKeyDraft)
+                                Toast.makeText(
+                                    context,
+                                    if (saved) "Gemini API key saved securely on this device." else "Could not save the key. Check device security settings and try again.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AuraIceCyan,
+                                contentColor = AuraCosmicBlack
+                            )
+                        ) {
+                            Text("Save API Key")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                val cleared = GeminiApiKeyStore.clearKey(context)
+                                geminiApiKeyDraft = ""
+                                Toast.makeText(
+                                    context,
+                                    if (cleared) "Saved Gemini API key removed from this device." else "Could not remove the saved key.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Remove Key")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Get a key from Google AI Studio. Use a personal key only on your own device, monitor its usage and never share it in chat or screenshots. A mobile APK can be reverse-engineered; this local-key option is for personal testing, not a public multi-user release.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AuraTextMuted,
+                        lineHeight = 18.sp
+                    )
                 }
             }
 
