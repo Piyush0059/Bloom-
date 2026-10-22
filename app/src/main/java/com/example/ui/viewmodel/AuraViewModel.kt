@@ -229,7 +229,7 @@ class AuraViewModel(
                     )
                     _activeSession.value = session
                     selectSession(session)
-                    // Introduce AURA warmly
+                    // Introduce Bloom warmly
                     sendWelcomeGreeting(session)
                 }
             }
@@ -362,7 +362,7 @@ class AuraViewModel(
                 _lastAssistantMessageId.value = assistantMsgId
 
                 // Vocalize response if in voice mode and not text only
-                if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
+                if (_isVoiceMode.value && isUsableFriendVoiceId(_userProfile.value.customVoiceId)) {
                     voiceManager.speak(responseText, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
                 }
 
@@ -430,7 +430,7 @@ Please move to a safe space and reach out to someone you trust or a professional
 
         repository.addMessage(uid, session.id, "crisis_alert", crisisMessage, modality)
 
-        if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
+        if (_isVoiceMode.value && isUsableFriendVoiceId(_userProfile.value.customVoiceId)) {
             voiceManager.speak(crisisMessage, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
         }
     }
@@ -488,7 +488,7 @@ Please move to a safe space and reach out to someone you trust or a professional
             if (rating == "change_approach") {
                 val adjustment = "Thank you for telling me. I will adjust right away. Would you prefer I simply listen without giving suggestions, or would you like to unpack a specific feeling together?"
                 repository.addMessage(uid, sess.id, "assistant", adjustment, if (_isVoiceMode.value) "voice" else "text")
-                if (_isVoiceMode.value && _userProfile.value.voicePreference != "None") {
+                if (_isVoiceMode.value && isUsableFriendVoiceId(_userProfile.value.customVoiceId)) {
                     voiceManager.speak(adjustment, _userProfile.value.customVoiceId, _userProfile.value.preferredLanguage)
                 }
             } else if (rating == "not_yet") {
@@ -543,12 +543,12 @@ Please move to a safe space and reach out to someone you trust or a professional
     fun getExportableTranscript(): String {
         val sess = _activeSession.value ?: return ""
         val builder = StringBuilder()
-        builder.appendLine("# AURA Conversation Transcript: ${sess.title}")
+        builder.appendLine("# Bloom Conversation Transcript: ${sess.title}")
         builder.appendLine("Date: ${sess.createdAt?.toDate() ?: "Recent"}")
         builder.appendLine("Voice: ${sess.voicePreference} | Language: ${sess.language}")
         builder.appendLine()
         _messages.value.forEach { msg ->
-            val speaker = if (msg.role == "user") "You" else "AURA"
+            val speaker = if (msg.role == "user") "You" else "Bloom"
             builder.appendLine("[$speaker (${msg.modality})]: ${msg.text}")
             builder.appendLine()
         }
