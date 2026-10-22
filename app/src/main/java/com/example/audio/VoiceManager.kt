@@ -8,29 +8,25 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.example.data.remote.GeminiService
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.util.Locale
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class VoiceManager(
     private val context: Context,
     private val coroutineScope: CoroutineScope
 ) {
     private var speechRecognizer: SpeechRecognizer? = null
-    private var ttsEngine: TextToSpeech? = null
-    private var isTtsInitialized = false
     private var mediaPlayer: MediaPlayer? = null
+    private var playbackTempFile: File? = null
 
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
@@ -44,41 +40,17 @@ class VoiceManager(
     private val _rmsLevel = MutableStateFlow(0f)
     val rmsLevel: StateFlow<Float> = _rmsLevel.asStateFlow()
 
+    private val _voiceError = MutableStateFlow<String?>(null)
+    val voiceError: StateFlow<String?> = _voiceError.asStateFlow()
+
     private var onSpeechFinalized: ((String) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
-
-    init {
-        initTts()
-    }
-
-    private fun initTts() {
-        ttsEngine = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                isTtsInitialized = true
-                ttsEngine?.language = Locale.ENGLISH
-                ttsEngine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        _isPlayingAudio.value = true
-                    }
-
-                    override fun onDone(utteranceId: String?) {
-                        _isPlayingAudio.value = false
-                    }
-
-                    override fun onError(utteranceId: String?) {
-                        _isPlayingAudio.value = false
-                    }
-                })
-            }
-        }
-    }
 
     fun startListening(
         language: String = "en",
         onFinalResult: (String) -> Unit,
         onError: (String) -> Unit
     ) {
-        // Immediate interruption: stop any ongoing audio playback first
         stopAudioPlayback()
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
@@ -124,8 +96,7 @@ class VoiceManager(
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected"
                         else -> "Speech recognition error ($error)"
                     }
-                    Log.w("VoiceManager", "Speech error: $errorMsg")
-                    // If no match was found but user entered partial text, preserve it
+                    Log.w("VoiceManager", "Speech recognition error: " + errorMsg)
                     if (error == SpeechRecognizer.ERROR_NO_MATCH && _partialTranscript.value.isNotBlank()) {
                         onSpeechFinalized?.invoke(_partialTranscript.value)
                     } else {
@@ -148,9 +119,7 @@ class VoiceManager(
                 override fun onPartialResults(partialResults: Bundle?) {
                     val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: ""
-                    if (text.isNotBlank()) {
-                        _partialTranscript.value = text
-                    }
+                    if (text.isNotBlank()) _partialTranscript.value = text
                 }
 
                 override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -171,128 +140,166 @@ class VoiceManager(
             speechRecognizer?.startListening(intent)
         } catch (e: Exception) {
             _isListening.value = false
-            onError("Unable to initialize speech recognizer: ${e.message}")
+            onError("Unable to initialize speech recognizer: " + (e.message ?: "unknown error"))
         }
     }
 
     fun stopListeningManually() {
         if (_isListening.value) {
-            speechRecognizer?.stopListening()
+            try {
+                speechRecognizer?.stopListening()
+            } catch (_: Exception) {}
             _isListening.value = false
         }
     }
 
     fun cancelListening() {
-        speechRecognizer?.cancel()
+        try {
+            speechRecognizer?.cancel()
+        } catch (_: Exception) {}
         _isListening.value = false
         _partialTranscript.value = ""
     }
 
     /**
-     * Speaks the assistant text using Gemini TTS (model gemini-3.8-flash-tts),
-     * with transparent fallback to Android on-device TextToSpeech.
+     * Speak only through the configured, consented Gemini replicated voice.
+     * There is deliberately no Android/system TextToSpeech fallback.
      */
     fun speak(
         text: String,
-        voiceName: String = "Aoede",
+        customVoiceId: String,
         language: String = "en"
     ) {
-        // Immediate interruption: stop existing playback first
         stopAudioPlayback()
-
+        _voiceError.value = null
         if (text.isBlank()) return
 
+        val voiceId = customVoiceId.trim()
+        if (!isReplicatedVoiceId(voiceId)) {
+            _voiceError.value = "Friend's voice is not configured. Add a valid Gemini replicated voice ID in Settings. No fallback voice will be played."
+            return
+        }
+
         coroutineScope.launch {
-            // First attempt high-fidelity Gemini TTS
-            val ttsResult = GeminiService.generateTTSAudio(text, voiceName)
-            if (ttsResult.isSuccess) {
-                val audioBytes = ttsResult.getOrNull()
-                if (audioBytes != null && audioBytes.isNotEmpty()) {
-                    playAudioBytes(audioBytes)
-                    return@launch
-                }
-            }
-
-            // Fallback to local Android TextToSpeech engine
-            withContext(Dispatchers.Main) {
-                if (isTtsInitialized && ttsEngine != null) {
-                    val targetLocale = when (language.lowercase()) {
-                        "ko" -> Locale.KOREAN
-                        "hi" -> Locale.forLanguageTag("hi-IN")
-                        "hinglish" -> Locale.forLanguageTag("en-IN")
-                        else -> Locale.ENGLISH
-                    }
-                    ttsEngine?.language = targetLocale
-                    // Slight pitch and rate adjustment for warmth
-                    if (voiceName == "Puck" || voiceName == "Fenrir") {
-                        ttsEngine?.setPitch(0.85f)
-                    } else {
-                        ttsEngine?.setPitch(1.05f)
-                    }
-                    ttsEngine?.setSpeechRate(0.95f)
-
-                    _isPlayingAudio.value = true
-                    ttsEngine?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "aura_utterance_${System.currentTimeMillis()}")
-                }
+            val result = GeminiService.generateTTSAudio(text, voiceId, language)
+            val audioBytes = result.getOrNull()
+            if (result.isSuccess && audioBytes != null && audioBytes.isNotEmpty()) {
+                _voiceError.value = null
+                playAudioBytes(audioBytes)
+            } else {
+                _isPlayingAudio.value = false
+                _voiceError.value = result.exceptionOrNull()?.localizedMessage
+                    ?: "Friend's voice could not be generated. Check the replica ID, Gemini API key, and quota."
+                Log.w("VoiceManager", "Gemini replicated voice synthesis failed.")
             }
         }
+    }
+
+    private fun isReplicatedVoiceId(value: String): Boolean =
+        Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$").matches(value)
+
+    private fun pcmToWavIfNeeded(bytes: ByteArray): ByteArray {
+        val isWav = bytes.size >= 12 &&
+            String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+            String(bytes, 8, 4, Charsets.US_ASCII) == "WAVE"
+        if (isWav) return bytes
+
+        // Gemini GenerateContent TTS returns 24 kHz, mono, 16-bit PCM. Wrap
+        // those samples so Android MediaPlayer can decode them as WAV.
+        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray(Charsets.US_ASCII))
+        header.putInt(36 + bytes.size)
+        header.put("WAVE".toByteArray(Charsets.US_ASCII))
+        header.put("fmt ".toByteArray(Charsets.US_ASCII))
+        header.putInt(16)
+        header.putShort(1.toShort())
+        header.putShort(1.toShort())
+        header.putInt(24_000)
+        header.putInt(48_000)
+        header.putShort(2.toShort())
+        header.putShort(16.toShort())
+        header.put("data".toByteArray(Charsets.US_ASCII))
+        header.putInt(bytes.size)
+        return header.array() + bytes
     }
 
     private fun playAudioBytes(bytes: ByteArray) {
+        stopAudioPlayback()
+        var tempFile: File? = null
+        var player: MediaPlayer? = null
         try {
-            stopAudioPlayback()
-            val tempFile = File.createTempFile("aura_tts_", ".mp3", context.cacheDir)
-            FileOutputStream(tempFile).use { it.write(bytes) }
+            val audioFile = File.createTempFile("bloom_friend_voice_", ".wav", context.cacheDir)
+            tempFile = audioFile
+            FileOutputStream(audioFile).use { it.write(pcmToWavIfNeeded(bytes)) }
+            playbackTempFile = audioFile
 
-            mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                        .build()
-                )
-                setDataSource(tempFile.absolutePath)
-                setOnPreparedListener {
+            val createdPlayer = MediaPlayer()
+            player = createdPlayer
+            mediaPlayer = createdPlayer
+            createdPlayer.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                    .build()
+            )
+            createdPlayer.setDataSource(audioFile.absolutePath)
+            createdPlayer.setOnPreparedListener {
+                if (mediaPlayer !== createdPlayer) {
+                    try { createdPlayer.release() } catch (_: Exception) {}
+                    audioFile.delete()
+                } else {
                     _isPlayingAudio.value = true
-                    start()
+                    createdPlayer.start()
                 }
-                setOnCompletionListener {
-                    _isPlayingAudio.value = false
-                    tempFile.delete()
-                    release()
-                    mediaPlayer = null
-                }
-                setOnErrorListener { _, _, _ ->
-                    _isPlayingAudio.value = false
-                    tempFile.delete()
-                    release()
-                    mediaPlayer = null
-                    true
-                }
-                prepareAsync()
             }
+            createdPlayer.setOnCompletionListener { finishPlayback(createdPlayer, audioFile) }
+            createdPlayer.setOnErrorListener { _, what, extra ->
+                Log.w("VoiceManager", "Friend voice playback failed (what=" + what + ", extra=" + extra + ").")
+                finishPlayback(createdPlayer, audioFile)
+                true
+            }
+            createdPlayer.prepareAsync()
         } catch (e: Exception) {
-            Log.e("VoiceManager", "Error playing audio bytes", e)
+            try { player?.release() } catch (_: Exception) {}
+            if (mediaPlayer === player) mediaPlayer = null
+            if (playbackTempFile === tempFile) playbackTempFile = null
+            tempFile?.delete()
             _isPlayingAudio.value = false
+            _voiceError.value = "Friend's voice audio could not be played on this device."
+            Log.w("VoiceManager", "Error preparing friend voice audio: " + e.javaClass.simpleName)
         }
     }
 
-    /**
-     * Immediately stops playback of any speech audio and discards queues.
-     */
+    private fun finishPlayback(player: MediaPlayer, file: File) {
+        if (mediaPlayer === player) {
+            mediaPlayer = null
+            if (playbackTempFile === file) playbackTempFile = null
+            _isPlayingAudio.value = false
+            try { player.release() } catch (_: Exception) {}
+        } else {
+            // The user may have interrupted playback while an async callback
+            // was pending. Never revive the old player or overwrite current state.
+            try { player.release() } catch (_: Exception) {}
+        }
+        file.delete()
+    }
+
+    /** Immediately stops playback, even while MediaPlayer is still preparing. */
     fun stopAudioPlayback() {
+        val player = mediaPlayer
+        val tempFile = playbackTempFile
+        mediaPlayer = null
+        playbackTempFile = null
         try {
-            if (_isPlayingAudio.value || mediaPlayer?.isPlaying == true) {
-                mediaPlayer?.stop()
-                mediaPlayer?.release()
-                mediaPlayer = null
+            if (player != null) {
+                try {
+                    if (player.isPlaying) player.stop()
+                } catch (_: Exception) {}
+                try { player.reset() } catch (_: Exception) {}
+                try { player.release() } catch (_: Exception) {}
             }
-            if (ttsEngine?.isSpeaking == true) {
-                ttsEngine?.stop()
-            }
-        } catch (e: Exception) {
-            Log.w("VoiceManager", "Error during stopAudioPlayback", e)
         } finally {
+            tempFile?.delete()
             _isPlayingAudio.value = false
         }
     }
@@ -300,9 +307,7 @@ class VoiceManager(
     fun release() {
         stopAudioPlayback()
         cancelListening()
-        speechRecognizer?.destroy()
+        try { speechRecognizer?.destroy() } catch (_: Exception) {}
         speechRecognizer = null
-        ttsEngine?.shutdown()
-        ttsEngine = null
     }
 }
