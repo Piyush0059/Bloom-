@@ -125,6 +125,7 @@ fun ConversationScreen(
     val isGuest by viewModel.isGuestMode.collectAsState()
     val isListening by viewModel.voiceManager.isListening.collectAsState()
     val isPlayingAudio by viewModel.voiceManager.isPlayingAudio.collectAsState()
+    val voiceError by viewModel.voiceManager.voiceError.collectAsState()
     val partialTranscript by viewModel.voiceManager.partialTranscript.collectAsState()
     val audioLevel by viewModel.voiceManager.rmsLevel.collectAsState()
 
@@ -480,11 +481,11 @@ fun ConversationScreen(
                                 )
                             }
 
-                            if (statusMessage != null && currentOrbState == OrbState.IDLE) {
+                            if ((statusMessage != null || voiceError != null) && currentOrbState == OrbState.IDLE) {
                                 Text(
-                                    text = statusMessage ?: "",
+                                    text = voiceError ?: statusMessage ?: "",
                                     style = TechnicalMonospace,
-                                    color = AuraTextMuted,
+                                    color = if (voiceError != null) AuraCrisisCoral else AuraTextMuted,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
