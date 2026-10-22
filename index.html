@@ -89,7 +89,7 @@ button,input,textarea,select{font:inherit}button{color:inherit;cursor:pointer}bu
   <div class="dialog-head"><h2 id="settingsTitle">Bloom settings</h2><button class="icon-btn" data-close="settingsDialog" aria-label="Close settings"><svg viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>
   <div class="dialog-body">
     <div class="field"><label for="apiKeyInput">Gemini API key</label><input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your personal API key"><div class="field-help">Your key is kept in this browser tab's session storage and sent directly to Google Gemini when you send a message. It is not saved in Bloom's repository or local chat history. Do not use this personal-key mode on a shared device or present it as a public production setup.</div><div class="field-help"><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a key in Google AI Studio ↗</a></div></div>
-    <div class="field"><label for="modelSelect">Gemini model</label><select id="modelSelect"><option value="gemini-3.5-flash">Gemini 3.5 Flash</option><option value="gemini-3.8-flash">Gemini 3.8 Flash</option></select><div class="field-help">Availability depends on your Google AI Studio account and region. If the selected model is unavailable, choose another model shown in your account's API documentation.</div></div>
+    <div class="field"><label for="modelSelect">Gemini model</label><select id="modelSelect"><option value="gemini-3.8-flash">Gemini 3.8 Flash</option><option value="gemini-3.6-flash">Gemini 3.6 Flash</option></select><div class="field-help">Availability depends on your Google AI Studio account and region. If the selected model is unavailable, choose another model shown in your account's API documentation.</div></div>
     <div class="field"><label for="memoryNoteInput">What should Bloom remember about you?</label><textarea id="memoryNoteInput" maxlength="1800" placeholder="Only add context you want Bloom to use in future chats."></textarea><div class="field-help">This note stays in this browser's local storage. When Memory is enabled, it is included in prompts sent to Google Gemini.</div></div>
     <div class="check-row"><input id="memoryToggle" type="checkbox"><label for="memoryToggle">Remember across conversations<small>When on, Bloom includes a short excerpt from recent saved chats plus your memory note in Gemini requests. Turn this off for each chat to be kept separate.</small></label></div>
     <div class="check-row"><input id="reducedMotionToggle" type="checkbox"><label for="reducedMotionToggle">Reduce motion<small>Use less movement in the animated sphere and interface.</small></label></div>
@@ -102,7 +102,7 @@ button,input,textarea,select{font:inherit}button{color:inherit;cursor:pointer}bu
 <dialog id="historyDialog" aria-labelledby="historyTitle">
   <div class="dialog-head"><h2 id="historyTitle">Your conversations</h2><button class="icon-btn" data-close="historyDialog" aria-label="Close history"><svg viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>
   <div class="dialog-body"><div class="history-list" id="historyList"></div><div class="small-warning">These conversations are saved only in this browser. Export anything you want to keep before clearing history. Clearing history cannot remove data already sent to Google Gemini.</div></div>
-  <div class="modal-actions"><button class="btn danger-btn" id="deleteHistoryButton">Delete all history</button><button class="btn primary" data-close="historyDialog">Done</button></div>
+  <div class="modal-actions"><button class="btn" id="exportHistoryButton">Export JSON</button><button class="btn danger-btn" id="deleteHistoryButton">Delete all history</button><button class="btn primary" data-close="historyDialog">Done</button></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -206,7 +206,7 @@ function openDialog(id){const d=$(id);if(!d)return;if(typeof d.showModal==="func
 function closeDialog(id){const d=$(id);if(!d)return;if(typeof d.close==="function")d.close();else d.removeAttribute("open");}
 function populateSettings(){
   try{$("apiKeyInput").value=sessionStorage.getItem("bloom.gemini-key")||"";}catch(e){$("apiKeyInput").value="";}
-  $("modelSelect").value=localStorage.getItem(MODEL_KEY)||"gemini-3.5-flash";
+  $("modelSelect").value=localStorage.getItem(MODEL_KEY)||"gemini-3.8-flash";
   $("memoryNoteInput").value=localStorage.getItem(NOTE_KEY)||"";
   $("memoryToggle").checked=memoryEnabled;
   $("reducedMotionToggle").checked=localStorage.getItem(MOTION_KEY)==="true";
@@ -343,7 +343,7 @@ $("newChatButton").addEventListener("click",startNewChat);
 $("saveSettingsButton").addEventListener("click",saveSettings);
 $("clearApiKeyButton").addEventListener("click",function(){try{sessionStorage.removeItem("bloom.gemini-key");}catch(e){}$("apiKeyInput").value="";showToast(t("keyRemoved"));});
 $("languageSelect").addEventListener("change",function(){language=this.value;localStorage.setItem(LANGUAGE_KEY,language);applyLanguage();if(recognition){try{recognition.abort();}catch(e){}}});
-$("deleteHistoryButton").addEventListener("click",clearHistory);
+$("deleteHistoryButton").addEventListener("click",clearHistory);$("exportHistoryButton").addEventListener("click",function(){exportHistory();showToast(t("export")+" complete.");});
 Array.from(document.querySelectorAll("[data-close]")).forEach(function(b){b.addEventListener("click",function(){closeDialog(b.getAttribute("data-close"));});});
 Array.from(document.querySelectorAll("dialog")).forEach(function(d){d.addEventListener("click",function(e){if(e.target===d)closeDialog(d.id);});});
 $("footerVersion").title="Bloom web MVP. Friend-voice generation and a secure server backend are not configured in this deployment.";
