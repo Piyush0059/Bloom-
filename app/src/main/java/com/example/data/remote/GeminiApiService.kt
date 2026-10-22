@@ -24,6 +24,12 @@ interface GeminiApiService {
         @Header("x-goog-api-key") apiKey: String,
         @Body request: GenerateContentRequest
     ): GenerateContentResponse
+
+    @POST("v1beta/interactions")
+    suspend fun generateInteraction(
+        @Header("x-goog-api-key") apiKey: String,
+        @Body request: InteractionRequest
+    ): InteractionResponse
 }
 
 object RetrofitClient {
@@ -190,32 +196,32 @@ $memoryContextBuilder
             )
         }
 
-        val request = GenerateContentRequest(
-            contents = listOf(
-                Content(parts = listOf(Part(text = text)))
-            ),
-            generationConfig = GenerationConfig(
-                responseModalities = listOf("AUDIO"),
-                speechConfig = SpeechConfig(
-                    voiceConfig = VoiceConfig(voice = voiceId),
-                    languageCode = when (language.lowercase()) {
-                        "ko" -> "ko-KR"
-                        "hinglish", "hi" -> "en-IN"
-                        else -> "en-US"
-                    }
-                )
+        val request = InteractionRequest(
+            model = "gemini-3.8-flash-tts",
+            input = text.take(1800),
+            responseFormat = InteractionResponseFormat(type = "audio"),
+            generationConfig = InteractionGenerationConfig(
+                speechConfig = listOf(InteractionSpeechConfig(voice = voiceId))
             )
         )
 
         try {
-            val response = RetrofitClient.service.generateContent("gemini-3.8-flash-tts", apiKey, request)
-            val part = response.candidates.firstOrNull()?.content?.parts?.firstOrNull { it.inlineData != null }
-            val inlineData = part?.inlineData
-            if (inlineData != null) {
-                val bytes = android.util.Base64.decode(inlineData.data, android.util.Base64.DEFAULT)
-                Result.success(bytes)
+            val response = RetrofitClient.service.generateInteraction(apiKey, request)
+            val audioBase64 = response.outputAudio?.data
+                ?: response.steps.asSequence()
+                    .filter { it.type == "model_output" }
+                    .flatMap { it.content.asSequence() }
+                    .firstOrNull { it.type == "audio" && !it.data.isNullOrBlank() }
+                    ?.data
+            if (audioBase64.isNullOrBlank()) {
+                Result.failure(IllegalStateException("Gemini returned no audio for the configured friend voice."))
             } else {
-                Result.failure(IllegalStateException("Voice synthesis failed for voice ID: $voiceId"))
+                val bytes = android.util.Base64.decode(audioBase64, android.util.Base64.DEFAULT)
+                if (bytes.isEmpty()) {
+                    Result.failure(IllegalStateException("Gemini returned an empty audio payload."))
+                } else {
+                    Result.success(bytes)
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
