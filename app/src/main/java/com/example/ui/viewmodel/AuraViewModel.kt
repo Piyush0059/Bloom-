@@ -13,7 +13,6 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.R
 import com.example.audio.VoiceManager
 import com.example.data.model.BloomLanguage
 import com.example.data.model.CrisisResource
@@ -565,10 +564,21 @@ Please move to a safe space and reach out to someone you trust or a professional
         onError: (String) -> Unit
     ) {
         val credentialManager = CredentialManager.create(context)
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            onError("default_web_client_id missing from google-services.json")
+        // google-services.json is intentionally not committed. Resolve the generated
+        // Firebase web client ID dynamically so builds without private Firebase config
+        // still compile and can use guest mode.
+        val clientIdResource = context.resources.getIdentifier(
+            "default_web_client_id",
+            "string",
+            context.packageName
+        )
+        if (clientIdResource == 0) {
+            onError("Google Sign-In is not configured for this build. Add your Firebase google-services.json, or continue in guest mode.")
+            return
+        }
+        val clientId = context.getString(clientIdResource)
+        if (clientId.isBlank()) {
+            onError("Google Sign-In client ID is blank. Check your Firebase configuration.")
             return
         }
 
