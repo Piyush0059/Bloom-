@@ -42,7 +42,7 @@ class AuraRepository(
         id = "guest_user",
         userId = "guest_user",
         displayName = "Guest Companion",
-        voicePreference = "Aoede",
+        voicePreference = "None",
         preferredLanguage = "en",
         cloudHistoryEnabled = false,
         onboarded = false,
@@ -91,6 +91,7 @@ class AuraRepository(
                 "displayName" to profile.displayName,
                 "email" to profile.email,
                 "voicePreference" to profile.voicePreference,
+                "customVoiceId" to profile.customVoiceId,
                 "preferredLanguage" to profile.preferredLanguage,
                 "cloudHistoryEnabled" to profile.cloudHistoryEnabled,
                 "onboarded" to profile.onboarded,
@@ -129,7 +130,8 @@ class AuraRepository(
         userId: String,
         title: String,
         voicePreference: String,
-        language: String
+        language: String,
+        customVoiceId: String = ""
     ): Result<String> {
         val uid = userId.ifBlank { requireUserId() }
         val sessionId = UUID.randomUUID().toString()
@@ -140,6 +142,7 @@ class AuraRepository(
                 userId = "guest_user",
                 title = title,
                 voicePreference = voicePreference,
+                customVoiceId = customVoiceId,
                 language = language,
                 messageCount = 0L,
                 createdAt = Timestamp.now(),
@@ -157,6 +160,7 @@ class AuraRepository(
                 "userId" to uid,
                 "title" to title,
                 "voicePreference" to voicePreference,
+                "customVoiceId" to customVoiceId,
                 "language" to language,
                 "messageCount" to 0L,
                 "summary" to "",
