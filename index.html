@@ -87,7 +87,7 @@ button,input,textarea,select{font:inherit}button{color:inherit;cursor:pointer}bu
   </section>
 </main>
 
-<footer class="bottom-note"><span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-2.9 7.9-7 10-4.1-2.1-7-5.4-7-10V6l7-3Z" stroke="currentColor" stroke-width="1.6"/></svg><span id="footerPrivacy">Local-first by design. You control your history.</span></span><span id="footerVersion">BLOOM BETA · WEB PREVIEW</span></footer>
+<footer class="bottom-note"><span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-2.9 7.9-7 10-4.1-2.1-7-5.4-7-10V6l7-3Z" stroke="currentColor" stroke-width="1.6"/></svg><span id="footerPrivacy">Local-first by design. You control your history.</span></span><span id="footerVersion">BLOOM PRIVATE WEB · BETA</span></footer>
 </div>
 
 <dialog id="settingsDialog" aria-labelledby="settingsTitle">
@@ -299,7 +299,7 @@ function applyLanguage(){
   $("historyTitle").textContent=language==="ko"?"대화 기록":language==="hinglish"?"Tumhari conversations":"Your conversations";
   renderMessages();
 }
-function openDialog(id){const d=$(id);if(!d)return;if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","");}
+function openDialog(id){const d=$(id);if(!d||d.open)return;if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","");}
 function closeDialog(id){const d=$(id);if(!d)return;if(typeof d.close==="function")d.close();else d.removeAttribute("open");}
 function populateSettings(){
   $("memoryNoteInput").value=localStorage.getItem(NOTE_KEY)||"";
@@ -444,9 +444,9 @@ $("voiceToggleButton").addEventListener("click",toggleVoiceReplies);
 $("languageSelect").addEventListener("change",function(){language=this.value;localStorage.setItem(LANGUAGE_KEY,language);applyLanguage();if(recognition){try{recognition.abort();}catch(e){}}});
 $("deleteHistoryButton").addEventListener("click",clearHistory);$("exportHistoryButton").addEventListener("click",function(){exportHistory();showToast(t("export")+" complete.");});
 Array.from(document.querySelectorAll("[data-close]")).forEach(function(b){b.addEventListener("click",function(){closeDialog(b.getAttribute("data-close"));});});
-Array.from(document.querySelectorAll("dialog")).forEach(function(d){d.addEventListener("click",function(e){if(e.target===d)closeDialog(d.id);});});
+Array.from(document.querySelectorAll("dialog")).forEach(function(d){d.addEventListener("click",function(e){if(e.target===d&&d.id!=="loginDialog")closeDialog(d.id);});});$("loginDialog").addEventListener("cancel",function(e){e.preventDefault();});
 $("footerVersion").title="Bloom private web build. Voice is only enabled when an approved voice ID is configured server-side.";
-$("voiceNote").addEventListener("click",function(){showToast(t("voiceMessage"));});
+$("voiceNote").addEventListener("click",function(){if(serverState.voiceReady)toggleVoiceReplies();else openSettings();});
 try{document.body.classList.toggle("reduced-motion",localStorage.getItem(MOTION_KEY)==="true");}catch(e){}
 applyLanguage();ensureSession();setupSpeechRecognition();refreshServerState();
 })();
