@@ -240,7 +240,7 @@ $memoryContextBuilder
         )
 
         try {
-            val response = RetrofitClient.service.generateContent("gemini-3.5-flash", apiKey, request)
+            val response = RetrofitClient.service.generateContent("gemini-3.8-flash", apiKey, request)
             val text = response.candidates.firstOrNull()?.content?.parts?.mapNotNull { it.text }?.joinToString("\n")
             if (text.isNullOrBlank()) {
                 Result.failure(IllegalStateException("No search grounding results found."))
@@ -270,7 +270,7 @@ $memoryContextBuilder
         )
 
         try {
-            val response = RetrofitClient.service.generateContent("gemini-3.5-transcribe", apiKey, request)
+            val response = RetrofitClient.service.generateContent("gemini-3.8-flash", apiKey, request)
             val text = response.candidates.firstOrNull()?.content?.parts?.mapNotNull { it.text }?.joinToString(" ")
             if (text.isNullOrBlank()) {
                 Result.failure(IllegalStateException("Could not transcribe audio."))
