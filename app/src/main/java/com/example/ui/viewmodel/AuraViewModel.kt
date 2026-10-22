@@ -133,7 +133,7 @@ class AuraViewModel(
         ),
         CrisisResource(
             name = "Suicide Prevention Line (자살예방상담전화)",
-            phone = "1393",
+            phone = "109",
             description = "24/7 national emergency suicide prevention hotline (South Korea).",
             region = "Korea"
         ),
@@ -402,7 +402,7 @@ class AuraViewModel(
 
 지금 바로 안전하고 따뜻한 전문 도움을 요청해 주세요:
 • 정신건강 위기상담전화: 1577-0199 (24시간)
-• 자살예방 상담전화: 1393 (24시간)
+• 자살예방 상담전화: 109 (24시간)
 • 긴급 신고: 112 또는 119
 
 지금 안전한 곳으로 이동하시고, 믿을 수 있는 분이나 전문 기관에 도움을 청해 주세요. Bloom이 항상 곁에 있겠습니다.
