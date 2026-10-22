@@ -47,13 +47,14 @@ data class ThinkingConfig(
 
 @Serializable
 data class SpeechConfig(
-    val voiceConfig: VoiceConfig
+    val voiceConfig: VoiceConfig,
+    val languageCode: String? = null
 )
 
 @Serializable
 data class VoiceConfig(
     val prebuiltVoiceConfig: PrebuiltVoiceConfig? = null,
-    val replicatedVoiceConfig: ReplicatedVoiceConfig? = null
+    val voice: String? = null
 )
 
 @Serializable
@@ -61,10 +62,6 @@ data class PrebuiltVoiceConfig(
     val voiceName: String
 )
 
-@Serializable
-data class ReplicatedVoiceConfig(
-    val voiceId: String
-)
 
 @Serializable
 data class GenerateContentResponse(
