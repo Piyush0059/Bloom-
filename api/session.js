@@ -1,7 +1,7 @@
 "use strict";
-const { isServerConfigured, voiceIsConfigured, isAuthenticated, sendJson } = require("../lib/security");
+import { isServerConfigured, voiceIsConfigured, isAuthenticated, sendJson } from "../lib/security.js";
 
-module.exports = function handler(req, res) {
+export default function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return sendJson(res, 405, { error: "Method not allowed." });
@@ -13,4 +13,4 @@ module.exports = function handler(req, res) {
     voiceReady: configured && voiceIsConfigured(),
     model: process.env.GEMINI_MODEL || "gemini-3.8-flash"
   });
-};
+}
