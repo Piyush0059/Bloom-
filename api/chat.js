@@ -127,17 +127,15 @@ export default async function handler(req, res) {
   if (body.speak === true && voiceReady) {
     try {
       const voiceId = getConfiguredVoiceId();
-      const tts = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent", {
+      const tts = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: answer.slice(0, 1800) }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: { voice: voiceId },
-              languageCode: language === "ko" ? "ko-KR" : language === "hinglish" ? "en-IN" : "en-US"
-            }
+          model: "gemini-3.8-flash-tts",
+          input: answer.slice(0, 1800),
+          response_format: { type: "audio" },
+          generation_config: {
+            speech_config: [{ voice: voiceId }]
           }
         }),
         signal: AbortSignal.timeout(25000)
@@ -148,18 +146,22 @@ export default async function handler(req, res) {
         console.error("Gemini voice generation failed", tts.status, providerMessage.slice(0, 220));
         voiceError = true;
       } else {
-        const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
-        const audioPart = parts.find((part) => part.inlineData && typeof part.inlineData.data === "string");
-        if (!audioPart) {
+        const audioData = (data.output_audio && data.output_audio.data) ||
+          ((data.steps || []).filter((step) => step.type === "model_output")
+            .flatMap((step) => step.content || [])
+            .find((part) => part.type === "audio" && typeof part.data === "string") || {}).data;
+        if (!audioData) {
           voiceError = true;
-          console.error("Gemini voice response contained no inline audio data.");
+          console.error("Gemini Interactions response contained no output audio.");
         } else {
-          const pcm = Buffer.from(audioPart.inlineData.data, "base64");
-          if (pcm.length > 5 * 1024 * 1024) {
+          const audio = Buffer.from(audioData, "base64");
+          if (audio.length > 6 * 1024 * 1024) {
             voiceError = true;
             console.error("Gemini voice response exceeded the safe size limit.");
           } else {
-            audioBase64 = pcmToWav(pcm).toString("base64");
+            // Unary Interactions TTS normally returns WAV with RIFF/WAVE headers;
+            // pcmToWav preserves WAV and only wraps raw PCM if the provider returns it.
+            audioBase64 = pcmToWav(audio).toString("base64");
           }
         }
       }
