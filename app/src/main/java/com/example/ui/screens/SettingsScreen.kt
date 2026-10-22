@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -86,6 +87,7 @@ fun SettingsScreen(
     val isGuest by viewModel.isGuestMode.collectAsState()
 
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var voiceIdDraft by remember(userProfile.customVoiceId) { mutableStateOf(userProfile.customVoiceId) }
 
     Scaffold(
         topBar = {
@@ -213,7 +215,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Voice Persona Selection
+            // Friend's Voice — no prebuilt/system fallback
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = AuraSurfaceNavy),
@@ -222,34 +224,62 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Vocal Persona & Speech",
+                        text = "Friend's Voice",
                         style = MaterialTheme.typography.titleMedium,
                         color = AuraTextPrimary,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Powered by high-fidelity Gemini TTS (gemini-3.8-flash-tts)",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "Bloom will speak only with the friend voice ID you configure below. If it is missing or fails, Bloom stays silent and keeps the text reply.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = AuraTextMuted,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                     )
-
                     SettingOptionRow(
-                        title = "Warm Feminine Voice (Aoede)",
-                        isSelected = userProfile.voicePreference == "Aoede",
-                        onClick = { viewModel.updatePreferences("Aoede", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled) }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SettingOptionRow(
-                        title = "Warm Masculine Voice (Puck)",
-                        isSelected = userProfile.voicePreference == "Puck",
-                        onClick = { viewModel.updatePreferences("Puck", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled) }
+                        title = "Use Friend's Replicated Voice",
+                        isSelected = userProfile.voicePreference == "Friend",
+                        onClick = {
+                            viewModel.updatePreferences("Friend", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled)
+                            if (!userProfile.customVoiceId.matches(Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$"))) {
+                                Toast.makeText(context, "Configure the friend's verified Gemini voice ID below first.", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     SettingOptionRow(
-                        title = "Text Only (No Voice Audio)",
+                        title = "Text Only (No Spoken Replies)",
                         isSelected = userProfile.voicePreference == "None",
                         onClick = { viewModel.updatePreferences("None", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled) }
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = voiceIdDraft,
+                        onValueChange = { voiceIdDraft = it },
+                        modifier = Modifier.fillMaxWidth().testTag("custom_voice_id_input"),
+                        label = { Text("Gemini replicated voice ID") },
+                        placeholder = { Text("voice_…") },
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            val message = viewModel.updateCustomVoiceId(voiceIdDraft)
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AuraIceCyan,
+                            contentColor = AuraCosmicBlack
+                        )
+                    ) {
+                        Text("Save Friend's Voice ID")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Google AI Studio requires a clean 10–30 second reference recording from the same adult speaker and a separate consent recording spoken by that person. The uploaded 8-second clip alone is not enough. Do not use this voice without your friend's explicit consent.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AuraTextMuted,
+                        lineHeight = 18.sp
                     )
                 }
             }
