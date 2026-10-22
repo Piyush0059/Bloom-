@@ -266,7 +266,10 @@ function systemPrompt(){
   return prompt;
 }
 function apiHistory(){
-  return (currentSession.messages||[]).filter(function(m){return m.role==="user"||m.role==="assistant";}).slice(-18).map(function(m){return {role:m.role==="assistant"?"model":"user",parts:[{text:String(m.text||"").slice(0,5000)}]};});
+  let messages=(currentSession.messages||[]).filter(function(m){return m.role==="user"||m.role==="assistant";});
+  // The welcome bubble is UI-only; start Gemini history with the first real user turn.
+  if(messages.length&&messages[0].role==="assistant")messages=messages.slice(1);
+  return messages.slice(-18).map(function(m){return {role:m.role==="assistant"?"model":"user",parts:[{text:String(m.text||"").slice(0,5000)}]};});
 }
 function pushMessage(role,text){
   currentSession.messages.push({role:role,text:text,time:now()});
