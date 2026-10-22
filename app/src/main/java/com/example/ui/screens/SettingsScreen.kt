@@ -237,7 +237,7 @@ fun SettingsScreen(
                     )
                     SettingOptionRow(
                         title = "Use Friend's Replicated Voice",
-                        isSelected = userProfile.voicePreference == "Friend",
+                        isSelected = userProfile.voicePreference == "Friend" && userProfile.customVoiceId.matches(Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$")),
                         onClick = {
                             viewModel.updatePreferences("Friend", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled)
                             if (!userProfile.customVoiceId.matches(Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$"))) {
@@ -248,7 +248,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     SettingOptionRow(
                         title = "Text Only (No Spoken Replies)",
-                        isSelected = userProfile.voicePreference != "Friend",
+                        isSelected = userProfile.voicePreference != "Friend" || !userProfile.customVoiceId.matches(Regex("^(voice_[A-Za-z0-9_-]{6,}|voicekey_[A-Za-z0-9_-]{6,})$")),
                         onClick = { viewModel.updatePreferences("None", userProfile.preferredLanguage, userProfile.cloudHistoryEnabled) }
                     )
                     Spacer(modifier = Modifier.height(14.dp))
