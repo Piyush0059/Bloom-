@@ -4,7 +4,7 @@ import { Script } from "node:vm";
 import session from "../api/session.js";
 import login from "../api/login.js";
 import logout from "../api/logout.js";
-import chat from "../api/chat.js";
+import chat, { pcmToWav } from "../api/chat.js";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const idSet = new Set(Array.from(html.matchAll(/\bid="([^"]+)"/g), (match) => match[1]));
@@ -18,6 +18,17 @@ assert.deepEqual(missingIds, [], "UI script references non-existent element IDs"
 assert.equal(html.includes('id="apiKeyInput"'), false, "Gemini API key must not be collected in browser UI");
 assert.equal(inlineScript.includes("speechSynthesis"), false, "must never use generic browser speech playback");
 assert.equal(html.includes('id="voiceToggleButton"'), true, "voice toggle must exist");
+assert.equal(inlineScript.includes('new Blob([bytes],{type:"audio/wav"})'), true, "browser voice playback must use WAV");
+const chatSource = await readFile(new URL("../api/chat.js", import.meta.url), "utf8");
+assert.equal(chatSource.includes("elevenlabs.io"), false, "voice output must use Gemini, not a second provider");
+assert.equal(chatSource.includes("gemini-3.8-flash-tts"), true, "Gemini TTS endpoint must be configured");
+const pcm = Buffer.from([0, 0, 1, 0, 255, 127, 0, 0]);
+const wav = pcmToWav(pcm);
+assert.equal(wav.toString("ascii", 0, 4), "RIFF");
+assert.equal(wav.toString("ascii", 8, 12), "WAVE");
+assert.equal(wav.readUInt32LE(24), 24000, "PCM must be wrapped as 24 kHz WAV");
+assert.equal(wav.length, 44 + pcm.length, "WAV header must include the original PCM payload");
+assert.equal(pcmToWav(wav), wav, "already wrapped WAV data must not get a second header");
 
 function mockResponse() {
   return {
@@ -34,8 +45,7 @@ const env = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   BLOOM_ACCESS_PASSWORD: process.env.BLOOM_ACCESS_PASSWORD,
   BLOOM_SESSION_SECRET: process.env.BLOOM_SESSION_SECRET,
-  ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
-  ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID,
+  BLOOM_CUSTOM_VOICE_ID: process.env.BLOOM_CUSTOM_VOICE_ID,
   BLOOM_VOICE_CONSENT_CONFIRMED: process.env.BLOOM_VOICE_CONSENT_CONFIRMED
 };
 
@@ -43,8 +53,7 @@ try {
   process.env.GEMINI_API_KEY = "test-gemini-key-not-real";
   process.env.BLOOM_ACCESS_PASSWORD = "bloom-test-password-long";
   process.env.BLOOM_SESSION_SECRET = "test-secret-at-least-thirty-two-characters-long";
-  delete process.env.ELEVENLABS_API_KEY;
-  delete process.env.ELEVENLABS_VOICE_ID;
+  delete process.env.BLOOM_CUSTOM_VOICE_ID;
   delete process.env.BLOOM_VOICE_CONSENT_CONFIRMED;
 
   const headers = { host: "bloom.test", origin: "https://bloom.test" };
@@ -79,15 +88,18 @@ try {
   await chat({ method: "POST", headers, body: { messages: [] } }, res);
   assert.equal(res.statusCode, 401, "chat endpoint must require a signed session");
 
-  process.env.ELEVENLABS_API_KEY = "test-voice-key-not-real";
-  process.env.ELEVENLABS_VOICE_ID = "test-voice-id";
+  process.env.BLOOM_CUSTOM_VOICE_ID = "voice_abc12345";
   res = mockResponse();
   await session({ method: "GET", headers: { ...headers, cookie } }, res);
   assert.equal(res.payload.voiceReady, false, "voice remains disabled without explicit consent flag");
   process.env.BLOOM_VOICE_CONSENT_CONFIRMED = "true";
   res = mockResponse();
   await session({ method: "GET", headers: { ...headers, cookie } }, res);
-  assert.equal(res.payload.voiceReady, true, "voice only turns on with provider credentials and consent flag");
+  assert.equal(res.payload.voiceReady, true, "voice only turns on with Gemini key, replica voice ID, and explicit consent flag");
+  process.env.BLOOM_CUSTOM_VOICE_ID = "Aoede";
+  res = mockResponse();
+  await session({ method: "GET", headers: { ...headers, cookie } }, res);
+  assert.equal(res.payload.voiceReady, false, "prebuilt voice names must not be accepted as replica voice IDs");
 
   res = mockResponse();
   await logout({ method: "POST", headers, body: {} }, res);
