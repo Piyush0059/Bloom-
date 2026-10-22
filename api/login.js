@@ -1,16 +1,10 @@
 "use strict";
-const {
-  isServerConfigured,
-  sessionToken,
-  setSessionCookie,
-  sendJson,
-  parseBody,
-  originIsSameSite,
-  rateLimit,
-  timingSafeStringEqual
-} = require("../lib/security");
+import {
+  isServerConfigured, sessionToken, setSessionCookie, sendJson, parseBody,
+  originIsSameSite, rateLimit, timingSafeStringEqual
+} from "../lib/security.js";
 
-module.exports = function handler(req, res) {
+export default function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return sendJson(res, 405, { error: "Method not allowed." });
@@ -32,4 +26,4 @@ module.exports = function handler(req, res) {
   }
   setSessionCookie(res, sessionToken());
   return sendJson(res, 200, { ok: true });
-};
+}
