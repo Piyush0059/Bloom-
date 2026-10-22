@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android:
@@ -49,8 +49,6 @@ jobs:
       - name: Accept Android SDK licenses
         shell: bash
         run: |
-          # sdkmanager exits successfully after accepting licences, but the upstream
-          # "yes" process may receive SIGPIPE when sdkmanager closes stdin early.
           set +o pipefail
           yes | "$SDKMANAGER" --licenses
           status=$?
@@ -61,11 +59,32 @@ jobs:
         shell: bash
         run: |
           "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          # The project targets the API 36.1 extension level where the SDK package is available.
-          "$SDKMANAGER" "platforms;android-36.1" || echo "API 36.1 package is not listed by this SDK mirror; Gradle will report if it is required."
+          "$SDKMANAGER" "platforms;android-36.1" || echo "API 36.1 package unavailable from this mirror; build output will determine whether it is required."
+
+      - name: Generate the missing Gradle wrapper
+        id: wrapper
+        shell: bash
+        run: |
+          if [ ! -f gradlew ] || [ ! -f gradlew.bat ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            gradle wrapper --gradle-version 9.3.1 --distribution-type bin
+            chmod +x gradlew
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit the generated wrapper to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.wrapper.outputs.created == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
+          git commit -m "Add the standard Gradle wrapper"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Run unit tests and assemble debug APK
-        run: gradle testDebugUnitTest assembleDebug --stacktrace
+        run: ./gradlew testDebugUnitTest assembleDebug --stacktrace
 
       - name: Upload debug APK for inspection
         if: success()
