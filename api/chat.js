@@ -1,14 +1,8 @@
 "use strict";
-
-const {
-  isServerConfigured,
-  voiceIsConfigured,
-  isAuthenticated,
-  sendJson,
-  parseBody,
-  originIsSameSite,
-  rateLimit
-} = require("../lib/security");
+import {
+  isServerConfigured, voiceIsConfigured, isAuthenticated, sendJson, parseBody,
+  originIsSameSite, rateLimit
+} from "../lib/security.js";
 
 const LANGUAGE_NAMES = {
   en: "English",
@@ -48,7 +42,7 @@ function cleanMessages(value) {
   return messages.slice(-24);
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return sendJson(res, 405, { error: "Method not allowed." });
@@ -88,7 +82,6 @@ module.exports = async function handler(req, res) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const providerMessage = data && data.error && typeof data.error.message === "string" ? data.error.message : "";
-      // Keep provider details in server logs only; never log prompts or credentials.
       console.error("Gemini API request failed", response.status, providerMessage.slice(0, 220));
       return sendJson(res, response.status === 429 ? 429 : 502, {
         error: response.status === 429
@@ -145,4 +138,4 @@ module.exports = async function handler(req, res) {
   }
 
   return sendJson(res, 200, { text: answer, audioBase64, voiceReady, voiceError });
-};
+}
