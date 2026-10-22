@@ -58,7 +58,8 @@ object RetrofitClient {
 
 object GeminiService {
     fun getApiKey(): String {
-        return BuildConfig.GEMINI_API_KEY.ifBlank { "" }
+        val personalKey = GeminiApiKeyStore.getStoredKey()
+        return personalKey.ifBlank { BuildConfig.GEMINI_API_KEY.ifBlank { "" } }
     }
 
     private fun getSystemInstruction(
