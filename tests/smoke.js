@@ -1,8 +1,23 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { Script } from "node:vm";
 import session from "../api/session.js";
 import login from "../api/login.js";
 import logout from "../api/logout.js";
 import chat from "../api/chat.js";
+
+const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const idSet = new Set(Array.from(html.matchAll(/\\bid="([^"]+)"/g), (match) => match[1]));
+const scriptMatches = Array.from(html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g));
+assert.equal(scriptMatches.length, 1, "expected one self-contained inline app script");
+const inlineScript = scriptMatches[0][1];
+new Script(inlineScript, { filename: "index.html:inline-script" });
+const directlyReferencedIds = new Set(Array.from(inlineScript.matchAll(/\\$\\("([^"]+)"\\)/g), (match) => match[1]));
+const missingIds = Array.from(directlyReferencedIds).filter((id) => !idSet.has(id));
+assert.deepEqual(missingIds, [], "UI script references non-existent element IDs");
+assert.equal(html.includes('id="apiKeyInput"'), false, "Gemini API key must not be collected in browser UI");
+assert.equal(inlineScript.includes("speechSynthesis"), false, "must never use generic browser speech playback");
+assert.equal(html.includes('id="voiceToggleButton"'), true, "voice toggle must exist");
 
 function mockResponse() {
   return {
