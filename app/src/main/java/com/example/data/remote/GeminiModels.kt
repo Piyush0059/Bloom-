@@ -1,6 +1,7 @@
 package com.example.data.remote
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
@@ -72,4 +73,53 @@ data class GenerateContentResponse(
 data class Candidate(
     val content: Content? = null,
     val finishReason: String? = null
+)
+
+
+@Serializable
+data class InteractionRequest(
+    val model: String,
+    val input: String,
+    @SerialName("response_format") val responseFormat: InteractionResponseFormat,
+    @SerialName("generation_config") val generationConfig: InteractionGenerationConfig
+)
+
+@Serializable
+data class InteractionResponseFormat(
+    val type: String = "audio"
+)
+
+@Serializable
+data class InteractionGenerationConfig(
+    @SerialName("speech_config") val speechConfig: List<InteractionSpeechConfig>
+)
+
+@Serializable
+data class InteractionSpeechConfig(
+    val voice: String
+)
+
+@Serializable
+data class InteractionResponse(
+    @SerialName("output_audio") val outputAudio: InteractionAudio? = null,
+    val steps: List<InteractionStep> = emptyList()
+)
+
+@Serializable
+data class InteractionAudio(
+    val data: String? = null,
+    @SerialName("mime_type") val mimeType: String? = null
+)
+
+@Serializable
+data class InteractionStep(
+    val type: String? = null,
+    val content: List<InteractionContent> = emptyList()
+)
+
+@Serializable
+data class InteractionContent(
+    val type: String? = null,
+    val data: String? = null,
+    @SerialName("mime_type") val mimeType: String? = null
 )
