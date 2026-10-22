@@ -44,7 +44,14 @@ jobs:
 
       - name: Accept Android SDK licenses
         shell: bash
-        run: yes | "$SDKMANAGER" --licenses
+        run: |
+          # sdkmanager exits successfully after accepting licences, but the upstream
+          # "yes" process may receive SIGPIPE when sdkmanager closes stdin early.
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses
+          status=$?
+          set -o pipefail
+          test "$status" -eq 0
 
       - name: Install Android SDK packages
         shell: bash
