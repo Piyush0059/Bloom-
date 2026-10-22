@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.example.audio.VoiceManager
+import com.example.data.remote.GeminiApiKeyStore
 import com.example.data.repository.AuraRepository
 import com.example.ui.screens.ConversationScreen
 import com.example.ui.screens.HelpNowScreen
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        GeminiApiKeyStore.initialize(applicationContext)
         enableEdgeToEdge()
 
         try {
