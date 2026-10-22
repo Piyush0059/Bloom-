@@ -94,7 +94,7 @@ button,input,textarea,select{font:inherit}button{color:inherit;cursor:pointer}bu
   <div class="dialog-head"><h2 id="settingsTitle">Bloom settings</h2><button class="icon-btn" data-close="settingsDialog" aria-label="Close settings"><svg viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>
   <div class="dialog-body">
     <div class="field"><label>Private AI backend</label><div class="server-info" id="serverStatusBox">Checking backend configuration…</div><div class="field-help">For privacy, Gemini and voice-provider keys are stored server-side in Vercel environment variables. Do not paste secrets into this page or commit them to GitHub. <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer">Open Vercel dashboard ↗</a></div></div>
-    <div class="field"><label>Friend's voice output</label><div class="server-info" id="voiceStatusBox">Checking the configured voice…</div><div class="field-help">Bloom plays no default/system voice. Voice output activates only after a consented voice ID, provider key, and server-side consent confirmation are configured. The current audio clip is about eight seconds; high-quality voice cloning generally needs a longer clean sample.</div></div>
+    <div class="field"><label>Friend's voice output</label><div class="server-info" id="voiceStatusBox">Checking the configured voice…</div><div class="field-help">Bloom plays no default/system voice. Voice output activates only after a consented voice ID, provider key, and server-side consent confirmation are configured. Google Gemini voice replication requires a clean 10–30 second reference recording from the same adult speaker plus a separate consent recording spoken by the voice owner. The uploaded 8-second clip is too short and cannot be used alone.</div></div>
     <div class="field"><label for="memoryNoteInput">What should Bloom remember about you?</label><textarea id="memoryNoteInput" maxlength="1800" placeholder="Only add context you want Bloom to use in future chats."></textarea><div class="field-help">This note stays in this browser's local storage. When Memory is enabled, it is sent to the private Bloom backend with a chat request.</div></div>
     <div class="check-row"><input id="memoryToggle" type="checkbox"><label for="memoryToggle">Remember across conversations<small>When on, Bloom includes a short excerpt from recent saved chats plus your memory note in Gemini requests. Turn this off for each chat to be kept separate.</small></label></div>
     <div class="check-row"><input id="reducedMotionToggle" type="checkbox"><label for="reducedMotionToggle">Reduce motion<small>Use less movement in the animated sphere and interface.</small></label></div>
@@ -195,8 +195,8 @@ function renderServerStatus(){
     else serverBox.innerHTML="<strong>Connected and signed in.</strong><br>AI model: "+escapeHtml(serverState.model||"configured model")+". Your API key stays on the server.";
   }
   if(voiceBox){
-    if(serverState.voiceReady)voiceBox.innerHTML="<strong>Voice provider configured.</strong><br>Only the owner-configured voice ID will be used. Voice replies remain off until you enable them in the chat panel.";
-    else voiceBox.innerHTML="<strong>Friend's voice is not connected yet.</strong><br>No spoken reply will play. The owner must configure an approved voice ID, provider key, and explicit consent flag on the server.";
+    if(serverState.voiceReady)voiceBox.innerHTML="<strong>Gemini friend voice configured.</strong><br>Only the consented Gemini voice ID is used. Voice replies stay off until enabled in the chat panel.";
+    else voiceBox.innerHTML="<strong>Friend's voice is not connected yet.</strong><br>No spoken reply will play. Add a valid Gemini replicated voice ID and explicitly confirm the voice owner's consent in the server environment.";
   }
   const toggle=$("voiceToggleButton");
   if(toggle){toggle.disabled=!serverState.voiceReady||!serverState.authenticated;toggle.setAttribute("aria-pressed",String(voiceRepliesOn&&serverState.voiceReady));toggle.textContent=!serverState.voiceReady?"Voice unavailable":voiceRepliesOn?"Voice on · friend’s voice":"Voice off";}
@@ -257,7 +257,7 @@ async function playGeneratedVoice(base64){
     if(activeAudio){activeAudio.pause();activeAudio=null;}
     const binary=atob(base64),bytes=new Uint8Array(binary.length);
     for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([bytes],{type:"audio/mpeg"}));
+    const url=URL.createObjectURL(new Blob([bytes],{type:"audio/wav"}));
     const audio=new Audio(url);activeAudio=audio;
     audio.addEventListener("ended",function(){URL.revokeObjectURL(url);if(activeAudio===audio)activeAudio=null;},{once:true});
     audio.addEventListener("error",function(){URL.revokeObjectURL(url);if(activeAudio===audio)activeAudio=null;showToast("The voice audio could not be played on this device.",true);},{once:true});
