@@ -52,10 +52,11 @@ When Voice Replication returns a permitted ID beginning with `voice_` or `voicek
 Prerequisites: Android Studio with a compatible Android SDK, JDK 17 or the JDK required by the installed Android Gradle Plugin, and network access to download Gradle dependencies.
 
 1. Open this repository in Android Studio and allow Gradle sync.
-2. Copy `.env.example` to a **local, untracked** `.env` and set a real `GEMINI_API_KEY`. The committed file contains placeholders, not a valid API key.
-3. If you use Firebase Google sign-in/cloud history, add the `google-services.json` for your own Firebase project to the expected app location and enable the Firebase products used by the app. This private configuration is not committed here.
-4. For friend-voice output, complete the Google AI Studio Voice Replication flow and enter the resulting `BLOOM_CUSTOM_VOICE_ID` in the app's Settings. Text Only remains the safe default until the ID is configured.
-5. Run **testDebugUnitTest** and **assembleDebug** from the Gradle tool window, or run:
+2. For the already-installed APK, open **Settings → AI Chat Setup**, paste your own Gemini API key and tap **Save API Key**. The key is encrypted locally with Android Keystore and is not synced to Firebase. This is convenient for personal testing but does not make a distributed APK safe from reverse engineering.
+3. If you build the APK yourself, you can also copy `.env.example` to a **local, untracked** `.env` and set `GEMINI_API_KEY`; the committed file contains placeholders, not a valid API key. A key saved in app Settings takes precedence over the build-time key.
+4. If you use Firebase Google sign-in/cloud history, add the `google-services.json` for your own Firebase project to the expected app location and enable the Firebase products used by the app. This private configuration is not committed here. Guest mode can still be used without Firebase sign-in.
+5. For friend-voice output, complete the Google AI Studio Voice Replication flow and enter the resulting `voice_...` or `voicekey_...` ID in the app's Settings. Text Only remains the safe default until the ID is configured.
+6. Run **testDebugUnitTest** and **assembleDebug** from the Gradle tool window, or run:
    ```bash
    ./gradlew testDebugUnitTest assembleDebug
    ```
