@@ -67,7 +67,7 @@ fun OnboardingScreen(
     onComplete: (voicePreference: String, language: String, stayGuest: Boolean) -> Unit,
     onGoogleSignInClicked: () -> Unit
 ) {
-    var selectedVoice by remember { mutableStateOf("Aoede") }
+    var selectedVoice by remember { mutableStateOf("None") }
     var selectedLanguage by remember { mutableStateOf("en") }
 
     val scrollState = rememberScrollState()
@@ -147,30 +147,19 @@ fun OnboardingScreen(
             )
 
             VoiceChoiceCard(
-                title = "Warm Feminine Voice",
-                subtitle = "Gentle, reflective cadence (Aoede)",
-                isSelected = selectedVoice == "Aoede",
+                title = "Friend's Voice",
+                subtitle = "Use only your friend's verified Gemini voice ID; configure it in Settings.",
+                isSelected = selectedVoice == "Friend",
                 icon = Icons.Default.RecordVoiceOver,
-                tag = "voice_feminine_card",
-                onClick = { selectedVoice = "Aoede" }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            VoiceChoiceCard(
-                title = "Warm Masculine Voice",
-                subtitle = "Steady, grounding resonance (Puck)",
-                isSelected = selectedVoice == "Puck",
-                icon = Icons.Default.Mic,
-                tag = "voice_masculine_card",
-                onClick = { selectedVoice = "Puck" }
+                tag = "voice_friend_card",
+                onClick = { selectedVoice = "Friend" }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             VoiceChoiceCard(
                 title = "Text Only",
-                subtitle = "Quiet chat without spoken vocalization",
+                subtitle = "No spoken replies until the friend's voice is explicitly configured.",
                 isSelected = selectedVoice == "None",
                 icon = Icons.AutoMirrored.Filled.Chat,
                 tag = "voice_text_only_card",
