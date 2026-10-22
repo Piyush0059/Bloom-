@@ -105,7 +105,7 @@ fun AuraApp(
                         context = activity,
                         activity = activity,
                         onSuccess = {
-                            viewModel.completeOnboarding("Aoede", "en", false)
+                            viewModel.completeOnboarding("None", "en", false)
                             currentScreen = AuraScreen.CONVERSATION
                             Toast.makeText(activity, "Welcome to Bloom!", Toast.LENGTH_SHORT).show()
                         },
