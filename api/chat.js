@@ -1,7 +1,7 @@
 "use strict";
 import {
   isServerConfigured, voiceIsConfigured, isAuthenticated, sendJson, parseBody,
-  originIsSameSite, rateLimit
+  originIsSameSite, rateLimit, getConfiguredVoiceId
 } from "../lib/security.js";
 
 const LANGUAGE_NAMES = {
@@ -17,6 +17,29 @@ function makeSystemPrompt(language, memory) {
   if (memory) prompt += "\n\nUser-approved memory context (provided because the user enabled Memory):\n" +
     memory + "\nTreat this as fallible, possibly outdated context. Use it only when relevant, and ask rather than assuming.";
   return prompt;
+}
+
+function pcmToWav(pcm, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
+  if (pcm.length >= 12 && pcm.toString("ascii", 0, 4) === "RIFF" && pcm.toString("ascii", 8, 12) === "WAVE") {
+    return pcm;
+  }
+  const blockAlign = channels * bitsPerSample / 8;
+  const byteRate = sampleRate * blockAlign;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
 }
 
 function cleanMessages(value) {
@@ -103,36 +126,45 @@ export default async function handler(req, res) {
   const voiceReady = voiceIsConfigured();
   if (body.speak === true && voiceReady) {
     try {
-      const tts = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" +
-        encodeURIComponent(process.env.ELEVENLABS_VOICE_ID) + "?output_format=mp3_44100_128", {
+      const voiceId = getConfiguredVoiceId();
+      const tts = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
-          "Accept": "audio/mpeg"
-        },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
         body: JSON.stringify({
-          text: answer.slice(0, 2000),
-          model_id: "eleven_multilingual_v2",
-          voice_settings: { stability: 0.52, similarity_boost: 0.8, style: 0.12, use_speaker_boost: true }
+          contents: [{ role: "user", parts: [{ text: answer.slice(0, 1800) }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: { voice: voiceId },
+              languageCode: language === "ko" ? "ko-KR" : language === "hinglish" ? "en-IN" : "en-US"
+            }
+          }
         }),
         signal: AbortSignal.timeout(25000)
       });
+      const data = await tts.json().catch(() => ({}));
       if (!tts.ok) {
-        const detail = (await tts.text().catch(() => "")).slice(0, 180);
-        console.error("Voice provider request failed", tts.status, detail.replace(/\s+/g, " "));
+        const providerMessage = data && data.error && typeof data.error.message === "string" ? data.error.message : "";
+        console.error("Gemini voice generation failed", tts.status, providerMessage.slice(0, 220));
         voiceError = true;
       } else {
-        const audio = Buffer.from(await tts.arrayBuffer());
-        if (audio.length > 6 * 1024 * 1024) {
-          console.error("Generated voice response exceeded safe size.");
+        const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+        const audioPart = parts.find((part) => part.inlineData && typeof part.inlineData.data === "string");
+        if (!audioPart) {
           voiceError = true;
+          console.error("Gemini voice response contained no inline audio data.");
         } else {
-          audioBase64 = audio.toString("base64");
+          const pcm = Buffer.from(audioPart.inlineData.data, "base64");
+          if (pcm.length > 5 * 1024 * 1024) {
+            voiceError = true;
+            console.error("Gemini voice response exceeded the safe size limit.");
+          } else {
+            audioBase64 = pcmToWav(pcm).toString("base64");
+          }
         }
       }
     } catch (error) {
-      console.error("Voice generation failed:", error && error.name ? error.name : "Error");
+      console.error("Gemini voice request failed:", error && error.name ? error.name : "Error");
       voiceError = true;
     }
   }
