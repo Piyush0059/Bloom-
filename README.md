@@ -1,113 +1,115 @@
-# Bloom — private AI companion
+# Bloom — Android app + private web companion
 
-Bloom is a mobile-first, multilingual AI companion with a calm animated interface. This repository now targets **Vercel**, not GitHub Pages, because the app uses server-side secrets, private-session authentication, and protected API routes.
+Bloom is a multilingual AI companion for reflective conversations. This repository contains **two interfaces**: an Android app (Jetpack Compose) and a private web preview (static UI plus Node/Vercel API routes). Both now enforce **Text Only** until a consented Gemini replicated voice ID is configured.
+
+## Current status
+
+- Android source changes and web backend are committed to `main`.
+- Node/web checks run through GitHub Actions.
+- An Android CI workflow now runs unit tests and builds a debug APK; check its run before treating the Android build as verified.
+- The web API requires a Vercel deployment and server-side environment values. GitHub Pages cannot run the protected `/api/*` functions.
+- The supplied voice attachment is about 8 seconds long. A working replicated voice ID has **not** been created from it. No real API keys or voice credentials have been committed.
 
 ## What is implemented
 
-- Responsive dark UI with an animated orbital intelligence sphere and reduced-motion support.
-- Interface/prompt language modes: Hinglish, English, and Korean.
-- Gemini text chat through a same-origin server function; the Gemini API key is never sent to browser JavaScript.
-- Password-protected private access using an HTTP-only, SameSite cookie signed with a server secret.
-- Server-side checks for payload sizes, request origin, methods, authentication and best-effort per-instance rate limits.
-- Browser-local conversation history, chat switching, JSON export, delete-all and optional user-controlled memory.
-- Browser speech recognition as input only where supported. Bloom does not use browser/system text-to-speech.
-- Optional ElevenLabs text-to-speech that activates only when the owner's approved voice ID, provider API key and explicit consent flag are configured server-side. There is no voice fallback.
-- Baseline smoke tests for login, signed sessions, protected chat, consent-gated voice and logout.
-- Security response headers, content-security-policy, no-cache APIs and deployment configuration.
+### Android app
 
-## Important voice status
+- Jetpack Compose UI with animated intelligence orb.
+- Language options: English, Korean, and Hinglish.
+- Gemini text chat, local guest mode, Firebase Auth/Firestore hooks, history, and export functions.
+- Gemini TTS uses an explicit replicated voice ID, not the prebuilt Aoede/Puck voices.
+- Android/system TextToSpeech fallback has been removed. If the configured friend voice is absent or fails, Bloom reports an error and does not substitute another voice.
+- TTS audio playback is saved as WAV, stopped/released safely on interruption, and temporary cache files are cleaned up.
+- Voice choice defaults to Text Only; Settings validates and saves the custom replica ID.
+- Automatic Android backup is disabled by default for private conversation data.
 
-The voice file shared for this project is an **8.04-second AAC clip**. It is not included in the public GitHub repository. This is too short to promise a high-fidelity voice clone. ElevenLabs recommends roughly **1–2 minutes of clear, consistent audio** for Instant Voice Cloning; source quality, accent and delivery affect the result. See the [official voice-cloning guide](https://elevenlabs.io/docs/eleven-creative/voices/voice-cloning/instant-voice-cloning).
+### Web app
 
-Only continue with the friend's voice if she explicitly agrees to this specific use. The recommended path is for the friend/voice owner to create or authorize an eligible Instant Voice Clone in the provider account, complete any consent/verification prompts themselves, and privately share the permitted voice ID. Professional Voice Cloning is restricted to the voice owner's own voice by ElevenLabs policy; do not bypass this. See [ElevenLabs voice-cloning policy and methods](https://elevenlabs.io/docs/eleven-api/concepts/voice-cloning).
+- Responsive mobile-first dark interface with layered animated orb, English/Korean/Hinglish UI and reduced-motion support.
+- Protected same-origin API routes for login, logout, session status, Gemini chat and optional Gemini replicated speech.
+- API keys remain in Vercel environment variables and are never collected in the page UI.
+- Password-protected session uses a signed, HTTP-only, SameSite cookie.
+- Input size checks, origin checks, method checks, and best-effort per-instance rate limiting.
+- Browser-local conversations and memory with export, delete-all, history switching, and opt-in memory.
+- Browser speech recognition is input-only where available. Browser/system text-to-speech is not used.
 
-The app's voice toggle stays disabled until these environment variables are present and the consent flag is explicitly enabled:
+## Friend voice: required real-world step
 
-- `ELEVENLABS_API_KEY`
-- `ELEVENLABS_VOICE_ID`
-- `BLOOM_VOICE_CONSENT_CONFIRMED=true`
+Google Gemini Voice Replication requires **two recordings from the same adult speaker**:
 
-Do not set the consent flag unless the voice owner has clearly agreed and you are permitted to use that voice. The audio file itself is never sent by this app to ElevenLabs; the server only sends the generated reply text to the voice already configured by the owner.
+1. A clean, natural **10–30 second reference recording**.
+2. A separate recording of the same speaker reading Google's mandatory consent statement in a supported language.
 
-## Set up and deploy on Vercel
+The clip uploaded for this chat is approximately 8 seconds and cannot meet the reference-duration requirement by itself. Bloom does not create a clone simply because a file was uploaded, and the file has not been added to the public repository. Ask your friend to explicitly agree to this specific use. The friend should record the consent phrase themselves and complete the Google AI Studio Voice Replication flow.
 
-### 1. Import the repository
+- [Official Gemini Voice Replication guide](https://ai.google.dev/gemini-api/docs/voice-replication)
+- [Official Gemini TTS guide](https://ai.google.dev/gemini-api/docs/speech-generation)
 
-1. Open [Vercel](https://vercel.com/new) and sign in.
-2. Import the GitHub repository `Piyush0059/Bloom-`.
-3. Use the repository root as the project root. Framework preset: **Other**. No frontend build command is required.
-4. Add the environment variables below before the first production deployment. Redeploy after changing environment values.
+When Voice Replication returns a permitted ID beginning with `voice_` or `voicekey_`, configure it only in a private setting. Bloom accepts only those replica-ID formats; a name like `Aoede` is not a replicated voice ID.
 
-### 2. Required server variables
+## Android: run and test
 
-Set these in **Vercel → Project → Settings → Environment Variables** for the environment you intend to use (Production, and Preview if needed):
+Prerequisites: Android Studio with a compatible Android SDK, JDK 17 or the JDK required by the installed Android Gradle Plugin, and network access to download Gradle dependencies.
 
-| Variable | Required | Purpose |
+1. Open this repository in Android Studio and allow Gradle sync.
+2. Copy `.env.example` to a **local, untracked** `.env` and set a real `GEMINI_API_KEY`. The committed file contains placeholders, not a valid API key.
+3. If you use Firebase Google sign-in/cloud history, add the `google-services.json` for your own Firebase project to the expected app location and enable the Firebase products used by the app. This private configuration is not committed here.
+4. For friend-voice output, complete the Google AI Studio Voice Replication flow and enter the resulting `BLOOM_CUSTOM_VOICE_ID` in the app's Settings. Text Only remains the safe default until the ID is configured.
+5. Run **testDebugUnitTest** and **assembleDebug** from the Gradle tool window, or run:
+   ```bash
+   ./gradlew testDebugUnitTest assembleDebug
+   ```
+6. Install the debug APK on a real Android device and test text chat, each language, history, no network, invalid API key, microphone denial, valid/invalid replica ID, audio playback and interruption.
+
+The mobile app currently uses its Gemini key through the native client configuration. Android APKs can be reverse-engineered, so restrict the key to the extent supported by the Google project, monitor quotas, and use a trusted backend for any public release. The web backend keeps the key server-side; this does not automatically secure the independent Android client.
+
+## Web: deploy privately on Vercel
+
+Vercel is required because the web version has protected API functions. A successful GitHub commit or static check is **not** a live deployment.
+
+1. Open [Vercel New Project](https://vercel.com/new) and import `Piyush0059/Bloom-`.
+2. Use repository root, Framework Preset **Other**, no frontend build command.
+3. In **Project → Settings → Environment Variables**, configure the required values below.
+4. Deploy, open the assigned Vercel URL, sign in, and test `/api/session` plus chat. Re-deploy after changing environment values.
+
+| Environment variable | Required | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Server-only Google Gemini API key |
-| `GEMINI_MODEL` | No | Defaults to `gemini-3.8-flash`; override if that model isn't enabled for your account |
-| `BLOOM_ACCESS_PASSWORD` | Yes | Private sign-in password; use a unique value at least 12 characters long |
-| `BLOOM_SESSION_SECRET` | Yes | Random secret of at least 32 characters used to sign session cookies |
-| `ELEVENLABS_API_KEY` | Voice only | Server-only voice provider key |
-| `ELEVENLABS_VOICE_ID` | Voice only | ID of the eligible, consented voice already in the provider account |
-| `BLOOM_VOICE_CONSENT_CONFIRMED` | Voice only | Set to literal `true` only after explicit voice-owner consent and provider policy checks |
+| `GEMINI_API_KEY` | Yes | Server-only Gemini API key |
+| `GEMINI_MODEL` | No | Defaults to `gemini-3.8-flash`; override for a model enabled for your account |
+| `BLOOM_ACCESS_PASSWORD` | Yes | Unique private-access password, at least 12 characters |
+| `BLOOM_SESSION_SECRET` | Yes | Random signing secret, at least 32 characters |
+| `BLOOM_CUSTOM_VOICE_ID` | Voice only | Approved Gemini replica ID: `voice_...` or `voicekey_...` |
+| `BLOOM_VOICE_CONSENT_CONFIRMED` | Voice only | Exact value `true` after consent and provider-policy checks; otherwise keep `false` |
 
-Generate a session secret in a trusted terminal with `openssl rand -hex 32`. Do not put secret values in source code, GitHub commits, screenshots, or this chat. Do not use the same secret as the access password.
+Generate a session secret in a trusted terminal with `openssl rand -hex 32`. Never put real secrets in this repository, source code, screenshots, or chat messages. Use separate values for the password and signing secret.
 
-Google's official model list: [Gemini API models](https://ai.google.dev/gemini-api/docs/models). ElevenLabs' official synchronous speech endpoint: [Create speech](https://elevenlabs.io/docs/api-reference/text-to-speech/convert).
+### Web security limits
 
-### 3. Sign in and test
+The web app is a personal private beta, not multi-user SaaS auth. Its in-memory rate limiter is best-effort and not shared across serverless instances; it does not replace provider quota/budget controls. Conversations are local to the browser and do not sync across devices. When memory is explicitly enabled, the selected excerpts and memory note are sent to Gemini as prompt context.
 
-After Vercel finishes deploying, open the Production URL:
+## Automated checks
 
-1. Sign in with `BLOOM_ACCESS_PASSWORD`.
-2. Send a short chat message and confirm that a reply appears.
-3. Refresh and switch chats; confirm history remains in the same browser.
-4. Export the conversation JSON and confirm that it contains no API keys.
-5. Sign out; verify the API returns to a locked state.
-6. To test audio, first configure an authorized voice ID plus the three voice environment variables, redeploy, then enable **Voice on · friend's voice**. If voice configuration is incomplete, no speech plays.
+- Web/API: `npm test` (Node.js 22 or newer). This checks JavaScript syntax, referenced HTML IDs, no client-side API key field, WAV header handling, session/login/logout, access protection and consent-gated voice readiness.
+- Android: GitHub Actions workflow **Android build and unit tests** runs `./gradlew testDebugUnitTest assembleDebug` and uploads a debug APK artifact when successful. This repository check is not a substitute for testing the resulting APK on your phone.
+- External live tests: actual Gemini responses and voice playback require your own valid API key, allowed model, and (for speech) completed voice replication. Do not mark those paths “working” until you test them with credentials configured outside source control.
 
-For a first deployment, visit `/api/session` on the Vercel domain. It reports only whether setup/login/voice are ready; it does not return keys. A correctly configured site should report `configured: true`. Sign-in is required before chat requests are accepted.
-
-## Security and known limits
-
-- This is a personal, password-protected MVP, not a multi-user SaaS authentication system.
-- The rate limiter is per serverless instance and best-effort; it does not replace provider-level spending limits, quotas or centralized rate limiting.
-- Conversation history and memory are stored in the current browser's local storage. They do not sync between devices. When Memory is enabled, selected recent excerpts and the user-entered note are sent to Gemini as context.
-- Gemini and voice calls are made by server functions. Provider responses can still fail because of invalid credentials, quota, model availability, network or provider policy.
-- Voice audio is not guaranteed to sound identical to the source speaker; synthesis can change accent, prosody and pronunciation.
-- Browser dictation availability and its processing vary by browser. It is input-only, not a spoken-response fallback.
-- Bloom is not a therapist or emergency service. Crisis responses need independent safety review before wider public release.
-
-## Local checks
-
-Requires Node.js 22 or later:
-
-```bash
-npm test
-```
-
-This runs JavaScript syntax checks plus small local tests of authentication and consent gating. It does not call paid external APIs; live Gemini and voice-provider checks must be performed after secrets are configured in Vercel.
-
-## Repository layout
+## Repository map
 
 ```text
 Bloom-/
-├── index.html
-├── api/
-│   ├── chat.js
-│   ├── login.js
-│   ├── logout.js
-│   └── session.js
-├── lib/
-│   └── security.js
-├── tests/
-│   └── smoke.js
-├── .github/workflows/ci.yml
+├── app/                       # Native Android app (Jetpack Compose)
+├── index.html                 # Web UI
+├── api/                       # Vercel session/login/chat functions
+├── lib/security.js            # Web session and request checks
+├── tests/smoke.js             # Web/API smoke tests
+├── .github/workflows/ci.yml   # Node/web checks
+├── .github/workflows/android-ci.yml
+├── .env.example               # Safe placeholders only
+├── firestore.rules            # User-scoped Firestore rules
 ├── package.json
 └── vercel.json
 ```
 
-## Deployment reality
+## Safety note
 
-GitHub Pages cannot run these API functions. Deploy on Vercel (or another Node.js serverless host configured for these routes) so keys remain server-side. A successful GitHub commit or local test is not evidence of a live deployment: use Vercel's completed deployment URL and test the protected API in that live environment.
+Bloom is an AI companion, not a therapist, medical device, or emergency service. Emotional support and crisis behaviour need human review and specific end-to-end tests before public release.
