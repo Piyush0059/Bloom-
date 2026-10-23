@@ -50,15 +50,6 @@ Prerequisites: Android Studio with a compatible Android SDK, JDK 17 or the JDK r
 
 The mobile app currently uses its Gemini key through the native client configuration. Android APKs can be reverse-engineered, so restrict the key to the extent supported by the Google project, monitor quotas, and use a trusted backend for any public release. The web backend keeps the key server-side; this does not automatically secure the independent Android client.
 
-## Web: deploy privately on Vercel
-
-Vercel is required because the web version has protected API functions. A successful GitHub commit or static check is **not** a live deployment.
-
-1. Open [Vercel New Project](https://vercel.com/new) and import `Piyush0059/Bloom-`.
-2. Use repository root, Framework Preset **Other**, no frontend build command.
-3. In **Project → Settings → Environment Variables**, configure the required values below.
-4. Deploy, open the assigned Vercel URL, sign in, and test `/api/session` plus chat. Re-deploy after changing environment values.
-
 | Environment variable | Required | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | Yes | Server-only Gemini API key |
