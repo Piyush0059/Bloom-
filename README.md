@@ -33,20 +33,6 @@ Bloom is a multilingual AI companion for reflective conversations. This reposito
 - Browser-local conversations and memory with export, delete-all, history switching, and opt-in memory.
 - Browser speech recognition is input-only where available. Browser/system text-to-speech is not used.
 
-## Friend voice: required real-world step
-
-Google Gemini Voice Replication requires **two recordings from the same adult speaker**:
-
-1. A clean, natural **10–30 second reference recording**.
-2. A separate recording of the same speaker reading Google's mandatory consent statement in a supported language.
-
-The clip uploaded for this chat is approximately 8 seconds and cannot meet the reference-duration requirement by itself. Bloom does not create a clone simply because a file was uploaded, and the file has not been added to the public repository. Ask your friend to explicitly agree to this specific use. The friend should record the consent phrase themselves and complete the Google AI Studio Voice Replication flow.
-
-- [Official Gemini Voice Replication guide](https://ai.google.dev/gemini-api/docs/voice-replication)
-- [Official Gemini TTS guide](https://ai.google.dev/gemini-api/docs/speech-generation)
-
-When Voice Replication returns a permitted ID beginning with `voice_` or `voicekey_`, configure it only in a private setting. Bloom accepts only those replica-ID formats; a name like `Aoede` is not a replicated voice ID.
-
 ## Android: run and test
 
 Prerequisites: Android Studio with a compatible Android SDK, JDK 17 or the JDK required by the installed Android Gradle Plugin, and network access to download Gradle dependencies.
